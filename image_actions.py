@@ -119,26 +119,44 @@ def view_image(t0):
 	t2 = Image.fromarray(t1)
 	t2.show()
 
+def get_image_dims(batch_of_images):
+	"""
+	grabs the dimensions of each image and saves to an array
+	"""
+	im_dims = []
+	for im in batch_of_images:
+		width, height = im.size
+		im_dims.append([width, height])
+	return np.array(im_dims)
+
+
+
+
 
 def batch_image_preprocessing(batch_of_images):
 	"""
-	preprocessing for images before VGG16
+	preprocessing for images before VGG16 also gets the dimensions of the raw image
 	"""
 	im_list =[]
+	im_dims = []
 	for im in batch_of_images:
 		im_numpy = np.array(im)
+		im_dims.append(list(im_numpy.shape[:-1]))
 		im_numpy = image_preprocessing(im_numpy)
 		im_list.append(im_numpy)
 	im_tensor = np.concatenate(im_list)
+
+	#VGG16 preprocessing (mean subtraction)
 	im_batch = preprocess_input(im_tensor)
-	return im_batch
+	
+	return im_batch, im_dims
 
 
-def image_preprocessing(im):
+def image_preprocessing(im_numpy):
 	"""
 	preprocessing for images before VGG16
 	"""
-	im_numpy = np.array(im)
+	#im_numpy = np.array(im)
 	im_numpy = im_numpy[:, :, ::-1] # keep this in if the color channel order needs reversing
 	### given an image, get the features (i.e. run it through the conv net)
 	im = cv2.resize(im_numpy, (224, 224)).astype(np.float32)
