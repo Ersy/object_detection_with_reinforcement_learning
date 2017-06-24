@@ -1,7 +1,8 @@
 import numpy as np
 import argparse
-import cv2
-
+import matplotlib
+matplotlib.use("webagg")
+import matplotlib.pyplot as plt
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
@@ -29,7 +30,6 @@ args = vars(parser.parse_args())
 epochs_id = args['n']
 image = args['image']
 
-print(epochs_id)
 
 
 ### loading up VOC images of a given class
@@ -41,7 +41,9 @@ img_list = image_actions.load_images(VOC_path, img_name_list)
 
 
 ### converting images of a given batch size to an image tensor 
-image_batch_tensor, image_dims_list = image_actions.batch_image_preprocessing(img_list[:batch_size_val]) #expects a list of PIL objects
+raw_image_batch_list, image_dims_list = image_actions.batch_image_raw_data(img_list[:batch_size_val]) #expects a list of PIL objects
+processed_batch_tensor = image_actions.batch_image_preprocessing(raw_image_batch_list)
+
 
 """ 
 ### test code for classification
@@ -99,10 +101,6 @@ no so we'll have to save the original dimensions beforehand
 what a drag
 
 """
-t1 = image_batch_tensor[0] #grab an image
-bb = np.array([[10, 10],[100,100]]) #define a bounding box subregion
-t2 = t1[bb[0,0]:bb[1,0], bb[0,1]:bb[1,1]] #use bounding box subregion to slice image array
-
 
 """
 defining the subregion actions
@@ -115,44 +113,47 @@ e.g. centre, tl, tr, bl, br
 
 
 def get_TL_bb(origin, width, height):
-	x_origin = origin[0]
-	y_origin = origin[1]
-	top_left = [x_origin, y_origin]
-	bottom_right = [int(x_origin+0.6*width), int(y_origin+0.6*height)]
+	x_origin = origin[1]
+	y_origin = origin[0]
+	top_left = [y_origin, x_origin]
+	bottom_right = [int(y_origin+0.6*height), int(x_origin+0.6*width)]
 	return [top_left, bottom_right]
 
 def get_TR_bb(origin, width, height):
-	x_origin = origin[0]
-	y_origin = origin[1]
-	top_left = [int(x_origin+0.4*width), y_origin]
-	bottom_right = [width, int(y_origin+0.6*height)]
+	x_origin = origin[1]
+	y_origin = origin[0]
+	top_left = [y_origin, int(x_origin+0.4*width)]
+	bottom_right = [int(y_origin+0.6*height), width]
 	return [top_left, bottom_right]
 
 def get_BL_bb(origin, width, height):
-	x_origin = origin[0]
-	y_origin = origin[1]
-	top_left = [x_origin, int(y_origin+0.4*height)]
-	bottom_right = [int(x_origin+0.6*width), height]
+	x_origin = origin[1]
+	y_origin = origin[0]
+	top_left = [ int(y_origin+0.4*height), x_origin]
+	bottom_right = [height, int(x_origin+0.6*width)]
 	return [top_left, bottom_right]
 
 def get_BR_bb(origin, width, height):
-	x_origin = origin[0]
-	y_origin = origin[1]
-	top_left = [int(x_origin+0.4*width), int(y_origin+0.4*height)]
-	bottom_right = [width, height]
+	x_origin = origin[1]
+	y_origin = origin[0]
+	top_left = [int(y_origin+0.4*height), int(x_origin+0.4*width)]
+	bottom_right = [height, width]
 	return [top_left, bottom_right]
 
 def get_Centre_bb(origin, width, height):
-	x_origin = origin[0]
-	y_origin = origin[1]
-	top_left = [int(x_origin+0.2*width), int(y_origin+0.2*width)]
-	bottom_right = [int(x_origin+0.8*width), int(y_origin+0.8*height)]
+	x_origin = origin[1]
+	y_origin = origin[0]
+	top_left = [int(y_origin+0.2*width), int(x_origin+0.2*width)]
+	bottom_right = [int(y_origin+0.8*height), int(x_origin+0.8*width)]
 	return [top_left, bottom_right]
 
 def get_subcrop(im, bb, region):
 	origin = bb[0]
-	width = bb[1][0] - bb[0][0]
-	height = bb[1][1] - bb[0][1]
+	height = bb[1][0] - bb[0][0]
+	width = bb[1][1] - bb[0][1]
+	print('height', height)
+	print('width', width)
+	
 	if region == 'TL':
 		subregion_bb = get_TL_bb(origin, width, height)
 	elif region == 'TR':
@@ -165,21 +166,33 @@ def get_subcrop(im, bb, region):
 		subregion_bb = get_Centre_bb(origin, width, height)
 	start_x = subregion_bb[0][0]
 	start_y = subregion_bb[0][1]
+	print('start', start_x, start_y)
+
 	end_x = subregion_bb[1][0]
 	end_y = subregion_bb[1][1]
+	print('end', end_x, end_y)
 	im_2 = im[start_x:end_x,start_y:end_y,:]
 	return im_2, subregion_bb
 
-
-
-t1 = image_batch_tensor[0]
-bb1 = [[0,0], list(image_dims_list[0])]
-t2, bb2 = get_subcrop(t1, bb1, region='TL')
-t3, bb3 = get_subcrop(t2, bb2, region='TR')
+test_image_ix = 1
+t1 = raw_image_batch_list[test_image_ix]
+bb1 = [[0,0], list(image_dims_list[test_image_ix])]
+t2, bb2 = get_subcrop(t1, bb1, region='BL')
+t3, bb3 = get_subcrop(t2, bb2, region='BL')
 t4, bb4 = get_subcrop(t3, bb3, region='BL')
 t5, bb5 = get_subcrop(t4, bb4, region='BL')
 
 
+plt.figure(1)
+plt.subplot(411)
+plt.imshow(t1)
+plt.subplot(412)
+plt.imshow(t2)
+plt.subplot(413)
+plt.imshow(t3)
+plt.subplot(414)
+plt.imshow(t4)
+plt.show()
 ### STILL BROKEN!!!!!
 ### t5 ends up as empty for some reason
 

@@ -130,26 +130,52 @@ def get_image_dims(batch_of_images):
 	return np.array(im_dims)
 
 
-
+def batch_image_raw_data(batch_of_PIL_images):
+	"""
+	converts the raw image from PIL format to a numpy array and also gets the dimensions of the raw images
+	"""
+	im_list =[]
+	im_dims = []
+	for im in batch_of_PIL_images:
+		im_numpy = np.array(im)
+		im_dims.append(list(im_numpy.shape[:-1]))
+		im_list.append(im_numpy)
+	return im_list, im_dims
 
 
 def batch_image_preprocessing(batch_of_images):
 	"""
-	preprocessing for images before VGG16 also gets the dimensions of the raw image
+	preprocessing for images before VGG16 
 	"""
-	im_list =[]
-	im_dims = []
-	for im in batch_of_images:
-		im_numpy = np.array(im)
-		im_dims.append(list(im_numpy.shape[:-1]))
-		im_numpy = image_preprocessing(im_numpy)
-		im_list.append(im_numpy)
+	im_list = []
+	for i in range(len(batch_of_images)):
+		im_processed = image_preprocessing(batch_of_images[i])
+		im_list.append(im_processed)
 	im_tensor = np.concatenate(im_list)
 
 	#VGG16 preprocessing (mean subtraction)
 	im_batch = preprocess_input(im_tensor)
 	
-	return im_batch, im_dims
+	return im_batch
+
+
+# def batch_image_preprocessing(batch_of_images):
+# 	"""
+# 	#preprocessing for images before VGG16 also gets the dimensions of the raw image
+# 	"""
+# 	im_list =[]
+# 	im_dims = []
+# 	for im in batch_of_images:
+# 		im_numpy = np.array(im)
+# 		im_dims.append(list(im_numpy.shape[:-1]))
+# 		im_numpy = image_preprocessing(im_numpy)
+# 		im_list.append(im_numpy)
+# 	im_tensor = np.concatenate(im_list)
+
+# 	#VGG16 preprocessing (mean subtraction)
+# 	im_batch = preprocess_input(im_tensor)
+	
+# 	return im_batch, im_dims
 
 
 def image_preprocessing(im_numpy):
