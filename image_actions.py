@@ -96,22 +96,18 @@ def get_bb_gt(image_name):
 							y_min.append(child3.text)
 						elif child3.tag == 'ymax':
 							y_max.append(child3.text)
-	category_and_bb = np.zeros([np.size(names), 5])
+	bb_list = []
+	category = []
 	for i in range(np.size(names)):
-		category_and_bb[i][0] = class_name_dict[names[i]]
-		category_and_bb[i][1] = x_min[i]
-		category_and_bb[i][2] = x_max[i]
-		category_and_bb[i][3] = y_min[i]
-		category_and_bb[i][4] = y_max[i]
-	return category_and_bb
+		category.append(class_name_dict[names[i]])
+		bb_list.append([[y_min[i], x_min[i]],[y_max[i], x_max[i]]])
+	return np.array(category, dtype='uint8'), np.array(bb_list, dtype='uint8')
 
 
 def view_image(t0):
 	"""
-	converts an image back into a viewable format and displays
+	converts an image back into a viewable format (PIL) and displays
 	"""
-	#t3 = np.moveaxis(t2, 0, 2) # not needed for tf backend
-	#t0 = t0[:, :, :, ::-1]
 	t0[:, :, 0] += 103.939
 	t0[:, :, 1] += 116.779
 	t0[:, :, 2] += 123.68
@@ -157,25 +153,6 @@ def batch_image_preprocessing(batch_of_images):
 	im_batch = preprocess_input(im_tensor)
 	
 	return im_batch
-
-
-# def batch_image_preprocessing(batch_of_images):
-# 	"""
-# 	#preprocessing for images before VGG16 also gets the dimensions of the raw image
-# 	"""
-# 	im_list =[]
-# 	im_dims = []
-# 	for im in batch_of_images:
-# 		im_numpy = np.array(im)
-# 		im_dims.append(list(im_numpy.shape[:-1]))
-# 		im_numpy = image_preprocessing(im_numpy)
-# 		im_list.append(im_numpy)
-# 	im_tensor = np.concatenate(im_list)
-
-# 	#VGG16 preprocessing (mean subtraction)
-# 	im_batch = preprocess_input(im_tensor)
-	
-# 	return im_batch, im_dims
 
 
 def image_preprocessing(im_numpy):

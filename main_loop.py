@@ -3,6 +3,7 @@ import argparse
 import matplotlib
 matplotlib.use("webagg")
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
@@ -45,11 +46,11 @@ raw_image_batch_list, image_dims_list = image_actions.batch_image_raw_data(img_l
 processed_batch_tensor = image_actions.batch_image_preprocessing(raw_image_batch_list)
 
 
-""" 
-### test code for classification
 
+### test code for classification
+"""
 classifier_model = VGG16(include_top=True, weights='imagenet') #classifier VGG16 model
-prediction = classifier_model.predict(image_batch_tensor, batch_size=batch_size_val)
+prediction = classifier_model.predict(processed_batch_tensor, batch_size=batch_size_val)
 P = imagenet_utils.decode_predictions(prediction)
 
 for j in P:
@@ -57,10 +58,10 @@ for j in P:
 		print("{}. {}: {:.2f}%".format(i+1, label, prob*100))
 	print("Next one!")
 
-for im in image_batch_tensor:
+for im in processed_batch_tensor:
 	image_actions.view_image(im)
-
 """
+
 
 """
 ### VGG16 model without top
@@ -112,88 +113,139 @@ e.g. centre, tl, tr, bl, br
 """
 
 
-def get_TL_bb(origin, width, height):
-	x_origin = origin[1]
-	y_origin = origin[0]
-	top_left = [y_origin, x_origin]
-	bottom_right = [int(y_origin+0.6*height), int(x_origin+0.6*width)]
-	return [top_left, bottom_right]
 
-def get_TR_bb(origin, width, height):
-	x_origin = origin[1]
-	y_origin = origin[0]
-	top_left = [y_origin, int(x_origin+0.4*width)]
-	bottom_right = [int(y_origin+0.6*height), width]
-	return [top_left, bottom_right]
+def TL_bb(bb):
+    """Takes a bounding box and returns a bounding box of the top left region"""
+    y_origin = bb[0,0]
+    x_origin = bb[0,1]
+    
+    y_end = bb[1,0]
+    x_end = bb[1,1]
 
-def get_BL_bb(origin, width, height):
-	x_origin = origin[1]
-	y_origin = origin[0]
-	top_left = [ int(y_origin+0.4*height), x_origin]
-	bottom_right = [height, int(x_origin+0.6*width)]
-	return [top_left, bottom_right]
+    tl = [y_origin, x_origin]
+    br = [y_end*0.6, x_end*0.6]
+    return np.array([tl, br])
 
-def get_BR_bb(origin, width, height):
-	x_origin = origin[1]
-	y_origin = origin[0]
-	top_left = [int(y_origin+0.4*height), int(x_origin+0.4*width)]
-	bottom_right = [height, width]
-	return [top_left, bottom_right]
 
-def get_Centre_bb(origin, width, height):
-	x_origin = origin[1]
-	y_origin = origin[0]
-	top_left = [int(y_origin+0.2*width), int(x_origin+0.2*width)]
-	bottom_right = [int(y_origin+0.8*height), int(x_origin+0.8*width)]
-	return [top_left, bottom_right]
+def TR_bb(bb):
+    """Takes a bounding box and returns a bounding box of the top right region"""
+    y_origin = bb[0,0]
+    x_origin = bb[0,1]
+    
+    y_end = bb[1,0]
+    x_end = bb[1,1]
 
-def get_subcrop(im, bb, region):
-	origin = bb[0]
-	height = bb[1][0] - bb[0][0]
-	width = bb[1][1] - bb[0][1]
-	print('height', height)
-	print('width', width)
-	
-	if region == 'TL':
-		subregion_bb = get_TL_bb(origin, width, height)
-	elif region == 'TR':
-		subregion_bb = get_TR_bb(origin, width, height)
-	elif region == 'BL':
-		subregion_bb = get_BL_bb(origin, width, height)
-	elif region == 'BR':
-		subregion_bb = get_BR_bb(origin, width, height)
-	elif region == 'Centre':
-		subregion_bb = get_Centre_bb(origin, width, height)
-	start_x = subregion_bb[0][0]
-	start_y = subregion_bb[0][1]
-	print('start', start_x, start_y)
+    tl = [y_origin, x_origin+((x_end-x_origin)*0.4)]
+    br = [y_end*0.6, x_end]
+    return np.array([tl, br])
 
-	end_x = subregion_bb[1][0]
-	end_y = subregion_bb[1][1]
-	print('end', end_x, end_y)
-	im_2 = im[start_x:end_x,start_y:end_y,:]
-	return im_2, subregion_bb
 
-test_image_ix = 1
+def BL_bb(bb):
+    """Takes a bounding box and returns a bounding box of the bottom left region"""
+    y_origin = bb[0,0]
+    x_origin = bb[0,1]
+    
+    y_end = bb[1,0]
+    x_end = bb[1,1]
+
+    tl = [y_origin+((y_end-y_origin)*0.4), x_origin]
+    br = [y_end, x_end*0.6]
+    return np.array([tl, br])
+
+
+def BR_bb(bb):
+    """Takes a bounding box and returns a bounding box of the bottom right region"""
+    y_origin = bb[0,0]
+    x_origin = bb[0,1]
+    
+    y_end = bb[1,0]
+    x_end = bb[1,1]
+
+    tl = [y_origin+((y_end-y_origin)*0.4), x_origin+((x_end-x_origin)*0.4)]
+    br = [y_end, x_end]
+    return np.array([tl, br])
+
+def centre_bb(bb):
+    """Takes a bounding box and returns a bounding box of the centre region"""
+    y_origin = bb[0,0]
+    x_origin = bb[0,1]
+    
+    y_end = bb[1,0]
+    x_end = bb[1,1]
+
+    tl = [y_origin+((y_end-y_origin)*0.2), x_origin+((x_end-x_origin)*0.2)]
+    br = [y_end-((y_end-y_origin)*0.2), x_end-((x_end-x_origin)*0.2)]
+    return np.array([tl, br])
+
+
+def crop_image(im, bb, region):
+    """
+    returns a desired cropped region of the raw image
+
+    im: raw image (numpy array)
+    bb: the bounding box of the current region (defined by top left and bottom right corner points)
+    region: 'TL', 'TR', 'BL', 'BR', 'centre'
+
+    """
+    
+    if region == 'TL':
+        new_bb = TL_bb(bb)
+    elif region == 'TR':
+        new_bb = TR_bb(bb)
+    elif region == 'BL':
+        new_bb = BL_bb(bb)
+    elif region == 'BR':
+        new_bb = BR_bb(bb)
+    elif region == 'centre':
+        new_bb = centre_bb(bb)
+
+
+    y_start = new_bb[0,0]
+    y_end = new_bb[1,0]
+    x_start = new_bb[0,1]
+    x_end = new_bb[1,1]
+    im = im[int(y_start):int(y_end), int(x_start):int(x_end), :]
+    return im, new_bb
+
+
+test_image_ix = 3
+bb1 = np.array([[0,0],list(raw_image_batch_list[test_image_ix].shape[:-1])])
 t1 = raw_image_batch_list[test_image_ix]
-bb1 = [[0,0], list(image_dims_list[test_image_ix])]
-t2, bb2 = get_subcrop(t1, bb1, region='BL')
-t3, bb3 = get_subcrop(t2, bb2, region='BL')
-t4, bb4 = get_subcrop(t3, bb3, region='BL')
-t5, bb5 = get_subcrop(t4, bb4, region='BL')
+t2, bb2 = crop_image(t1, bb1, 'centre')
+t3, bb3 = crop_image(t1, bb2, 'centre')
+t4, bb4 = crop_image(t1, bb3, 'centre')
+t5, bb5 = crop_image(t1, bb4, 'centre')
+t6, bb6 = crop_image(t1, bb5, 'centre')
 
 
+"""
 plt.figure(1)
-plt.subplot(411)
+plt.subplot(611)
 plt.imshow(t1)
-plt.subplot(412)
+plt.subplot(612)
 plt.imshow(t2)
-plt.subplot(413)
+plt.subplot(613)
 plt.imshow(t3)
-plt.subplot(414)
+plt.subplot(614)
 plt.imshow(t4)
+plt.subplot(615)
+plt.imshow(t5)
+plt.subplot(616)
+plt.imshow(t6)
 plt.show()
-### STILL BROKEN!!!!!
-### t5 ends up as empty for some reason
+"""
 
+T = 10
+for t in range(T):
+
+	ground_truth_bb_list = []
+	current_bb_list = []
+	for image_ix in range(len(raw_image_batch_list)):
+		image = raw_image_batch_list[image_ix]
+		image_name = img_name_list[image_ix]
+		
+		ground_truth_bb_list.append(image_actions.get_bb_gt(image_name))
+		current_bb_list.append(np.array([[0,0],list(raw_image_batch_list[image_ix].shape[:-1])]))
+
+		
 
