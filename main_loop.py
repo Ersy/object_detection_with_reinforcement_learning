@@ -11,6 +11,7 @@ from keras.applications.vgg16 import preprocess_input, VGG16
 ### Local helpers
 import image_actions
 import reinforcement_helper
+import action_functions
 
 ### 
 from keras import backend as K
@@ -19,7 +20,6 @@ K.set_image_dim_ordering('tf')
 
 ### Vars
 VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
-batch_size_val = 5
 
 
 
@@ -37,15 +37,14 @@ image = args['image']
 img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
+# grab a test image
+test_image = np.array(img_list[0])
 
-### get original dimensions of each image
+# grab the name for the test image
+test_name = img_list[0]
 
-
-### converting images of a given batch size to an image tensor 
-raw_image_batch_list, image_dims_list = image_actions.batch_image_raw_data(img_list[:batch_size_val]) #expects a list of PIL objects
-processed_batch_tensor = image_actions.batch_image_preprocessing(raw_image_batch_list)
-
-
+# get original dimensions of the test image
+test_dimensions = test_image.shape[:-1]
 
 ### test code for classification
 """
@@ -114,109 +113,13 @@ e.g. centre, tl, tr, bl, br
 
 
 
-def TL_bb(bb):
-    """Takes a bounding box and returns a bounding box of the top left region"""
-    y_origin = bb[0,0]
-    x_origin = bb[0,1]
-    
-    y_end = bb[1,0]
-    x_end = bb[1,1]
-
-    tl = [y_origin, x_origin]
-    br = [y_end*0.6, x_end*0.6]
-    return np.array([tl, br])
-
-
-def TR_bb(bb):
-    """Takes a bounding box and returns a bounding box of the top right region"""
-    y_origin = bb[0,0]
-    x_origin = bb[0,1]
-    
-    y_end = bb[1,0]
-    x_end = bb[1,1]
-
-    tl = [y_origin, x_origin+((x_end-x_origin)*0.4)]
-    br = [y_end*0.6, x_end]
-    return np.array([tl, br])
-
-
-def BL_bb(bb):
-    """Takes a bounding box and returns a bounding box of the bottom left region"""
-    y_origin = bb[0,0]
-    x_origin = bb[0,1]
-    
-    y_end = bb[1,0]
-    x_end = bb[1,1]
-
-    tl = [y_origin+((y_end-y_origin)*0.4), x_origin]
-    br = [y_end, x_end*0.6]
-    return np.array([tl, br])
-
-
-def BR_bb(bb):
-    """Takes a bounding box and returns a bounding box of the bottom right region"""
-    y_origin = bb[0,0]
-    x_origin = bb[0,1]
-    
-    y_end = bb[1,0]
-    x_end = bb[1,1]
-
-    tl = [y_origin+((y_end-y_origin)*0.4), x_origin+((x_end-x_origin)*0.4)]
-    br = [y_end, x_end]
-    return np.array([tl, br])
-
-def centre_bb(bb):
-    """Takes a bounding box and returns a bounding box of the centre region"""
-    y_origin = bb[0,0]
-    x_origin = bb[0,1]
-    
-    y_end = bb[1,0]
-    x_end = bb[1,1]
-
-    tl = [y_origin+((y_end-y_origin)*0.2), x_origin+((x_end-x_origin)*0.2)]
-    br = [y_end-((y_end-y_origin)*0.2), x_end-((x_end-x_origin)*0.2)]
-    return np.array([tl, br])
-
-
-def crop_image(im, bb, region):
-    """
-    returns a desired cropped region of the raw image
-
-    im: raw image (numpy array)
-    bb: the bounding box of the current region (defined by top left and bottom right corner points)
-    region: 'TL', 'TR', 'BL', 'BR', 'centre'
-
-    """
-    
-    if region == 'TL':
-        new_bb = TL_bb(bb)
-    elif region == 'TR':
-        new_bb = TR_bb(bb)
-    elif region == 'BL':
-        new_bb = BL_bb(bb)
-    elif region == 'BR':
-        new_bb = BR_bb(bb)
-    elif region == 'centre':
-        new_bb = centre_bb(bb)
-
-
-    y_start = new_bb[0,0]
-    y_end = new_bb[1,0]
-    x_start = new_bb[0,1]
-    x_end = new_bb[1,1]
-    im = im[int(y_start):int(y_end), int(x_start):int(x_end), :]
-    return im, new_bb
-
-
-test_image_ix = 3
-bb1 = np.array([[0,0],list(raw_image_batch_list[test_image_ix].shape[:-1])])
-t1 = raw_image_batch_list[test_image_ix]
-t2, bb2 = crop_image(t1, bb1, 'centre')
-t3, bb3 = crop_image(t1, bb2, 'centre')
-t4, bb4 = crop_image(t1, bb3, 'centre')
-t5, bb5 = crop_image(t1, bb4, 'centre')
-t6, bb6 = crop_image(t1, bb5, 'centre')
-
+bb1 = np.array([[0,0],test_dimensions])
+t1 = test_image
+t2, bb2 = action_functions.crop_image(t1, bb1, 'centre')
+t3, bb3 = action_functions.crop_image(t1, bb2, 'TL')
+t4, bb4 = action_functions.crop_image(t1, bb3, 'TR')
+t5, bb5 = action_functions.crop_image(t1, bb4, 'BR')
+t6, bb6 = action_functions.crop_image(t1, bb5, 'BL')
 
 """
 plt.figure(1)
@@ -235,17 +138,68 @@ plt.imshow(t6)
 plt.show()
 """
 
-T = 10
-for t in range(T):
 
-	ground_truth_bb_list = []
-	current_bb_list = []
-	for image_ix in range(len(raw_image_batch_list)):
-		image = raw_image_batch_list[image_ix]
-		image_name = img_name_list[image_ix]
-		
-		ground_truth_bb_list.append(image_actions.get_bb_gt(image_name))
-		current_bb_list.append(np.array([[0,0],list(raw_image_batch_list[image_ix].shape[:-1])]))
+### VGG16 model without top
+vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-		
+number_of_actions = 6
+history_length = 8
 
+### Q network definition
+
+# Q_network = reinforcement_helper.get_q_network(shape_of_input=conv_output.shape[1:])
+
+# loop through images
+for image_ix in range(len(img_list)):
+	
+	# get initial parameters for each image
+	image = np.array(img_list[image_ix])
+	image_name = img_name_list[image_ix]
+	image_dimensions = image.shape[:-1]
+
+	# collect bounding boxes for each image
+	ground_image_bb_gt = image_actions.get_bb_gt(image_name)
+
+	# initial bounding box (whole image, raw size)
+	initial_boundingbox = np.array([[0,0],image_dimensions])
+
+	IOU_list = []
+
+	for ground_truth in ground_image_bb_gt[1]:
+		current_iou = reinforcement_helper.IOU(ground_truth, initial_boundingbox)
+		IOU_list.append(np.array(current_iou))
+
+
+	history_vec = np.array((number_of_actions, history_length))
+
+	T = 10
+	for t in range(T):
+
+
+		# process the batch of images 
+		preprocessed_image = image_actions.image_preprocessing(image)
+
+		#state_vec = get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
+
+	# plug state into Q network
+
+
+
+		# run region through conv net (batch of images after resizing)
+		# add on the actions to the conv output
+		# run output state through Q network
+
+		# choose action with the highest Q or random action 
+		# (maybe one that is known to move closer)
+		# update action history
+
+		# calculate the reward
+			# measure IOU before and after, if IOU is improved, score = 1
+			# if action is trigger, then measure IOU, if IOU is above threshold = 3
+		# calculate the new state
+			# conv net + action history
+		# save it all as the experience (old state, action, reward, new state
+
+		# randomly sample a number of experiences and use for training
+
+		# next time step

@@ -22,7 +22,7 @@ class_name_dict = { 'aeroplane':1,
 					'horse':13,
 					'motorbike': 14,
 					'person':15,
-					'pottedplan':16,
+					'pottedplant':16,
 					'sheep':17,
 					'sofa':18,
 					'train':19,
@@ -100,8 +100,8 @@ def get_bb_gt(image_name):
 	category = []
 	for i in range(np.size(names)):
 		category.append(class_name_dict[names[i]])
-		bb_list.append([[y_min[i], x_min[i]],[y_max[i], x_max[i]]])
-	return np.array(category, dtype='uint8'), np.array(bb_list, dtype='uint8')
+		bb_list.append(np.array([[y_min[i], x_min[i]],[y_max[i], x_max[i]]]))
+	return np.array(category, dtype='uint16'), np.array(bb_list, dtype='uint16')
 
 
 def view_image(t0):
@@ -115,62 +115,17 @@ def view_image(t0):
 	t2 = Image.fromarray(t1)
 	t2.show()
 
-def get_image_dims(batch_of_images):
-	"""
-	grabs the dimensions of each image and saves to an array
-	"""
-	im_dims = []
-	for im in batch_of_images:
-		width, height = im.size
-		im_dims.append([width, height])
-	return np.array(im_dims)
 
-
-def batch_image_raw_data(batch_of_PIL_images):
-	"""
-	converts the raw image from PIL format to a numpy array and also gets the dimensions of the raw images
-	"""
-	im_list =[]
-	im_dims = []
-	for im in batch_of_PIL_images:
-		im_numpy = np.array(im)
-		im_dims.append(list(im_numpy.shape[:-1]))
-		im_list.append(im_numpy)
-	return im_list, im_dims
-
-
-def batch_image_preprocessing(batch_of_images):
-	"""
-	preprocessing for images before VGG16 
-	"""
-	im_list = []
-	for i in range(len(batch_of_images)):
-		im_processed = image_preprocessing(batch_of_images[i])
-		im_list.append(im_processed)
-	im_tensor = np.concatenate(im_list)
-
-	#VGG16 preprocessing (mean subtraction)
-	im_batch = preprocess_input(im_tensor)
-	
-	return im_batch
-
-
-def image_preprocessing(im_numpy):
+def image_preprocessing(im):
 	"""
 	preprocessing for images before VGG16
+	change the colour channel order
+	resize to 224x224
+	add dimension for input to vgg16
+	carry out standard preprocessing
 	"""
-	#im_numpy = np.array(im)
-	im_numpy = im_numpy[:, :, ::-1] # keep this in if the color channel order needs reversing
-	### given an image, get the features (i.e. run it through the conv net)
-	im = cv2.resize(im_numpy, (224, 224)).astype(np.float32)
-	# reverse the ordering of the dimensions (not needed for tf backend)
-	#im = np.moveaxis(im, 2, 0)
+	im = im[:, :, ::-1] # keep this in if the color channel order needs reversing
+	im = cv2.resize(im, (224, 224)).astype(np.float32)
 	im = np.expand_dims(im, axis=0)
+	im = preprocess_input(im)
 	return im
-
-
-if __name__ == '__main__':
-	img_name_list = get_img_names(VOC_path, 'boat_trainval')
-	img_list = load_images(VOC_path, img_name_list)
-	#img_labels = get_img_labels(VOC_path, 'boat_train')
-	img_list[0].show()

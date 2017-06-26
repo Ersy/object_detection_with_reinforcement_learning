@@ -6,15 +6,33 @@ from keras.initializers import normal, identity
 
 import numpy as np
 
-"""
+# Visual descriptor size
+visual_descriptor_size = 25088
+# Different actions that the agent can do
+number_of_actions = 6
+
+# Number of actions in the past to retain
+past_action_val = 8
+
+movement_reward = 1
+terminal_reward = 3
+iou_threshold = 0.6
+
+history_vector = np.array((past_action_val, number_of_actions))
+
+
+def conv_net_out(image, model_vgg):
+	return model_vgg.predict(image) 
+
+
 ### get the state by vgg_conv output, vectored, and stack on action history
-def get_state(image, history_vector, model_vgg):
-	descriptor_image = get_conv_image_descriptor_for_image(image, model_vgg)
+def get_state_as_vec(image, history_vector, model_vgg):
+	descriptor_image = conv_net_out(image, model_vgg)
 	descriptor_image = np.reshape(descriptor_image, (visual_descriptor_size, 1))
 	history_vector = np.reshape(history_vector, (number_of_actions*actions_of_history, 1))
 	state = np.vstack((descriptor_image, history_vector))
 	return state
-"""
+
 
 def get_q_network(shape_of_input, weights_path='0'):
 	model = Sequential()
@@ -25,7 +43,7 @@ def get_q_network(shape_of_input, weights_path='0'):
 	model.add(Dense(1024, init='lecun_uniform'))# shape, name: normal(shape, scale=0.01, name=name)))
 	model.add(Activation('relu'))
 	model.add(Dropout(0.2))
-	model.add(Dense(4, init='lecun_uniform'))#lambda shape, name: normal(shape, scale=0.01, name=name)))
+	model.add(Dense(number_of_actions, init='lecun_uniform'))#lambda shape, name: normal(shape, scale=0.01, name=name)))
 	model.add(Activation('linear'))
 	adam = Adam(lr=1e-6)
 	model.compile(loss='mse', optimizer=adam)
@@ -50,3 +68,5 @@ def IOU(bb, bb_gt):
 
 	iou = interArea / float(bb_Area + bb_gt_Area - interArea)
 	return iou
+
+
