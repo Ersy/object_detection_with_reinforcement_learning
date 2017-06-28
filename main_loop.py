@@ -143,7 +143,7 @@ plt.show()
 number_of_actions = 6
 history_length = 8
 Q_net_input_size = (25136, )
-batch_size = 5
+batch_size = 50
 
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
@@ -159,22 +159,30 @@ experiences = []
 # Q_network = reinforcement_helper.get_q_network(shape_of_input=conv_output.shape[1:])
 
 # loop through images
-for image_ix in range(10):#len(img_list)):
+for image_ix in range(len(img_list)):
 	
 
 	# start learning from experiences in batches after collecting a certain amount
-	if len(experiences) > 10:
-		random_ix = list(np.random.randint(0, len(experiences), batch_size))
-		random_experiences = np.array(experiences)[random_ix]
+	if len(experiences) > batch_size:
+		
+		# flatten the experiences list for learning
+		flat_experiences = [x for l in experiences for x in l]
+
+		random_ix = list(np.random.randint(0, len(flat_experiences), batch_size))
+		random_experiences = np.array(flat_experiences)[random_ix]
 		
 		initial_state = np.array([state[0] for state in random_experiences]).squeeze(1)
 		initial_Q = Q_net.predict(initial_state, batch_size)
 
 		next_state = np.array([state[3] for state in random_experiences]).squeeze(1)
 		next_Q = Q_net.predict(next_state, batch_size)
+
+		random_reward = np.expand_dims(random_experiences[:, 2], 1)
+
+		# target for the current state should be the Q value of the next state - the reward (but only for the chosen action, the rest should be set to 0 - CURRENT NOT IMPLEMENTED)
+		target = np.array(next_Q - random_reward)
 		
-		target = np.array(next_Q - random_experiences[2])
-		Q_net.fit(initial_state, target, batch_size, verbose=True)
+		Q_net.fit(initial_state, target, epochs=100, batch_size, verbose=True)
 
 	# get initial parameters for each image
 	original_image = np.array(img_list[image_ix])
