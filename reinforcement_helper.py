@@ -18,7 +18,26 @@ movement_reward = 1
 terminal_reward = 3
 iou_threshold = 0.6
 
-history_vector = np.array((past_action_val, number_of_actions))
+
+def get_reward(action, IOU_list, t):
+	"""
+	generates the correct reward based on the result of the chosen action
+	"""
+	if action == 5:
+		if max(IOU_list[t+1]) > iou_threshold:
+			return terminal_reward
+		else:
+			return -terminal_reward
+
+	else:
+		current_IOUs = IOU_list[t+1]
+		past_IOUs = IOU_list[t]
+		current_target = np.argmax(current_IOUs)
+		if current_IOUs[current_target] > 0:
+			return movement_reward
+		else:
+			return -movement_reward
+		
 
 
 def conv_net_out(image, model_vgg):
@@ -29,15 +48,14 @@ def conv_net_out(image, model_vgg):
 def get_state_as_vec(image, history_vector, model_vgg):
 	descriptor_image = conv_net_out(image, model_vgg)
 	descriptor_image = np.reshape(descriptor_image, (visual_descriptor_size, 1))
-	history_vector = np.reshape(history_vector, (number_of_actions*actions_of_history, 1))
-	state = np.vstack((descriptor_image, history_vector))
+	history_vector = np.reshape(history_vector, (number_of_actions*past_action_val, 1))
+	state = np.vstack((descriptor_image, history_vector)).T
 	return state
 
 
-def get_q_network(shape_of_input, weights_path='0'):
+def get_q_network(shape_of_input, number_of_actions, weights_path='0'):
 	model = Sequential()
-	model.add(Flatten(input_shape=shape_of_input))
-	model.add(Dense(1024, init='lecun_uniform'))# shape, name: normal(shape, scale=0.01, name=name)))
+	model.add(Dense(1024, init='lecun_uniform', input_shape = shape_of_input))# shape, name: normal(shape, scale=0.01, name=name)))
 	model.add(Activation('relu'))
 	model.add(Dropout(0.2))
 	model.add(Dense(1024, init='lecun_uniform'))# shape, name: normal(shape, scale=0.01, name=name)))
@@ -67,6 +85,8 @@ def IOU(bb, bb_gt):
 	bb_gt_Area = (bb_gt[1,0] - bb_gt[0,0] + 1) * (bb_gt[1,1] - bb_gt[0,1] + 1)
 
 	iou = interArea / float(bb_Area + bb_gt_Area - interArea)
+	if iou < 0:
+		return 0
 	return iou
 
 

@@ -1,5 +1,9 @@
 import numpy as np
 
+# dictionary mapping Q output index to actions
+action_dict = {0:'TL',1:'TR',2:'BR',3:'BL',4:'centre'}
+
+
 def TL_bb(bb):
 	"""Takes a bounding box and returns a bounding box of the top left region"""
 	y_origin = bb[0,0]
@@ -74,15 +78,15 @@ def crop_image(im, bb_in, region):
 
 	"""
 	
-	if region == 'TL':
+	if action_dict[region] == 'TL':
 		new_bb = TL_bb(bb_in)
-	elif region == 'TR':
+	elif action_dict[region] == 'TR':
 		new_bb = TR_bb(bb_in)
-	elif region == 'BL':
+	elif action_dict[region] == 'BL':
 		new_bb = BL_bb(bb_in)
-	elif region == 'BR':
+	elif action_dict[region] == 'BR':
 		new_bb = BR_bb(bb_in)
-	elif region == 'centre':
+	elif action_dict[region] == 'centre':
 		new_bb = centre_bb(bb_in)
 
 	y_start = new_bb[0,0]

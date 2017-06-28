@@ -108,9 +108,9 @@ def view_image(t0):
 	"""
 	converts an image back into a viewable format (PIL) and displays
 	"""
-	t0[:, :, 0] += 103.939
-	t0[:, :, 1] += 116.779
-	t0[:, :, 2] += 123.68
+	t0[:, :, 0] += 103
+	t0[:, :, 1] += 116
+	t0[:, :, 2] += 123
 	t1 = np.uint8(t0)
 	t2 = Image.fromarray(t1)
 	t2.show()

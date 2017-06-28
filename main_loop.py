@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use("webagg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import random
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
@@ -111,7 +112,7 @@ e.g. centre, tl, tr, bl, br
 
 """
 
-
+"""
 
 bb1 = np.array([[0,0],test_dimensions])
 t1 = test_image
@@ -121,7 +122,7 @@ t4, bb4 = action_functions.crop_image(t1, bb3, 'TR')
 t5, bb5 = action_functions.crop_image(t1, bb4, 'BR')
 t6, bb6 = action_functions.crop_image(t1, bb5, 'BL')
 
-"""
+
 plt.figure(1)
 plt.subplot(611)
 plt.imshow(t1)
@@ -139,20 +140,44 @@ plt.show()
 """
 
 
+number_of_actions = 6
+history_length = 8
+Q_net_input_size = (25136, )
+batch_size = 5
+
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-number_of_actions = 6
-history_length = 8
+Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='0')
 
 ### Q network definition
+epsilon = 0.9
+
+# collection of experiences [state, action, reward, next state]
+experiences = []
 
 # Q_network = reinforcement_helper.get_q_network(shape_of_input=conv_output.shape[1:])
 
 # loop through images
-for image_ix in range(len(img_list)):
+for image_ix in range(10):#len(img_list)):
 	
+
+	# start learning from experiences in batches after collecting a certain amount
+	if len(experiences) > 10:
+		random_ix = list(np.random.randint(0, len(experiences), batch_size))
+		random_experiences = np.array(experiences)[random_ix]
+		
+		initial_state = np.array([state[0] for state in random_experiences]).squeeze(1)
+		initial_Q = Q_net.predict(initial_state, batch_size)
+
+		next_state = np.array([state[3] for state in random_experiences]).squeeze(1)
+		next_Q = Q_net.predict(next_state, batch_size)
+		
+		target = np.array(next_Q - random_experiences[2])
+		Q_net.fit(initial_state, target, batch_size, verbose=True)
+
 	# get initial parameters for each image
+	original_image = np.array(img_list[image_ix])
 	image = np.array(img_list[image_ix])
 	image_name = img_name_list[image_ix]
 	image_dimensions = image.shape[:-1]
@@ -161,33 +186,86 @@ for image_ix in range(len(img_list)):
 	ground_image_bb_gt = image_actions.get_bb_gt(image_name)
 
 	# initial bounding box (whole image, raw size)
-	initial_boundingbox = np.array([[0,0],image_dimensions])
+	boundingbox = np.array([[0,0],image_dimensions])
 
+
+	# list to store IOU for each object in the image and current bounding box
 	IOU_list = []
 
+	image_IOU = []
+	# get the IOU for each object
 	for ground_truth in ground_image_bb_gt[1]:
-		current_iou = reinforcement_helper.IOU(ground_truth, initial_boundingbox)
-		IOU_list.append(np.array(current_iou))
+		current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
+		image_IOU.append(current_iou)
+	IOU_list.append(image_IOU)
 
+	# create the history vector
+	history_vec = np.zeros((number_of_actions, history_length))
 
-	history_vec = np.array((number_of_actions, history_length))
+	# preprocess the image
+	preprocessed_image = image_actions.image_preprocessing(original_image)
+
+	# get the state vector (conv output of VGG16 concatenated with the action history)
+	state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
+
+	# dumb trick to separate experiences for each image
+	experiences.append([])
 
 	T = 10
 	for t in range(T):
 
+		# add the current state to the experience list
+		experiences[image_ix].append([state_vec])
 
-		# process the batch of images 
+		# plug state into Q network
+		Q_vals = Q_net.predict(state_vec)
+
+		best_action = np.argmax(Q_vals)
+
+		# exploration or exploitation
+		if random.uniform(0,1) > epsilon:
+			print('Yes')
+			action = best_action
+			
+		else:
+			print('no')
+			action = random.randint(0, 5)
+
+		if action != 5:
+			image, boundingbox = action_functions.crop_image(original_image, boundingbox, action)
+		else:
+			print('TRIGGERED!')
+
+
+		# measure IOU
+		image_IOU = []
+		for ground_truth in ground_image_bb_gt[1]:
+			current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
+			image_IOU.append(current_iou)
+		IOU_list.append(image_IOU)
+
+		# get reward if termination action is taken
+		reward = reinforcement_helper.get_reward(action, IOU_list, t)
+
+		# get the next state
+
+		# update history vector
+		history_vec[:, :-1] = history_vec[:,1:]
+		history_vec[:,-1] = [0,0,0,0,0,0] # hard coded actions here
+		history_vec[action, -1] = 1
+
 		preprocessed_image = image_actions.image_preprocessing(image)
+		state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
+		
+		# add action, reward, and new state to the experience vector for the given image
+		experiences[image_ix][t].append(action)
+		experiences[image_ix][t].append(reward)
+		experiences[image_ix][t].append(state_vec)
 
-		#state_vec = get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
-
-	# plug state into Q network
+		#def IOU_diff(IOUs, time_step):
 
 
 
-		# run region through conv net (batch of images after resizing)
-		# add on the actions to the conv output
-		# run output state through Q network
 
 		# choose action with the highest Q or random action 
 		# (maybe one that is known to move closer)
