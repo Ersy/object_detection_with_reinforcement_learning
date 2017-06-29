@@ -38,14 +38,6 @@ image = args['image']
 img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
-# grab a test image
-test_image = np.array(img_list[0])
-
-# grab the name for the test image
-test_name = img_list[0]
-
-# get original dimensions of the test image
-test_dimensions = test_image.shape[:-1]
 
 ### test code for classification
 """
@@ -179,10 +171,18 @@ for image_ix in range(len(img_list)):
 
 		random_reward = np.expand_dims(random_experiences[:, 2], 1)
 
+		random_actions = np.expand_dims(random_experiences[:, 1], 1)
+		flat_actions = [x for l in random_actions for x in l]
+
+
+
 		# target for the current state should be the Q value of the next state - the reward (but only for the chosen action, the rest should be set to 0 - CURRENT NOT IMPLEMENTED)
 		target = np.array(next_Q - random_reward)
-		
-		Q_net.fit(initial_state, target, epochs=100, batch_size, verbose=True)
+
+		# this takes the initial Q values for the state and replaces only the Q values for the actions that were used to the new target, else the error should be 0
+		initial_Q[np.arange(len(initial_Q)), flat_actions] = target[np.arange(len(target)), flat_actions]
+
+		Q_net.fit(initial_state, initial_Q, epochs=100, batch_size=batch_size, verbose=True)
 
 	# get initial parameters for each image
 	original_image = np.array(img_list[image_ix])
@@ -231,7 +231,7 @@ for image_ix in range(len(img_list)):
 		best_action = np.argmax(Q_vals)
 
 		# exploration or exploitation
-		if random.uniform(0,1) > epsilon:
+		if random.uniform(0,1) < epsilon:
 			print('Yes')
 			action = best_action
 			
