@@ -63,7 +63,7 @@ def get_q_network(shape_of_input, number_of_actions, weights_path='0'):
 	model.add(Dropout(0.2))
 	model.add(Dense(number_of_actions, init='lecun_uniform'))#lambda shape, name: normal(shape, scale=0.01, name=name)))
 	model.add(Activation('linear'))
-	adam = Adam(lr=1e-10)
+	adam = Adam(lr=1e-6)
 	model.compile(loss='mse', optimizer=adam)
 	if weights_path != "0":
 		model.load_weights(weights_path)

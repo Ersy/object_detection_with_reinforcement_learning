@@ -19,7 +19,7 @@ measure IOU at end
 import numpy as np
 import argparse
 import matplotlib
-matplotlib.use("webagg")
+#matplotlib.use("webagg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import random
@@ -61,22 +61,25 @@ img_list = image_actions.load_images(VOC_path, img_name_list)
 number_of_actions = 6
 history_length = 8
 Q_net_input_size = (25136, )
-batch_size = 50
 
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/Q_net_weights.h5')
+Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5')
 
 ### Q network definition
-epsilon = 1
+epsilon = 0
 
+# stores proposal regions
+all_proposals = []
 
-# Q_network = reinforcement_helper.get_q_network(shape_of_input=conv_output.shape[1:])
+# stores ground truth regions
+all_ground_truth = []
 
 # loop through images
-for image_ix in range(1):#len(img_list)):
+for image_ix in range(100):#len(img_list)):
     
+    print("new image: ", image_ix)
     # get initial parameters for each image
     original_image = np.array(img_list[image_ix])
     image = np.array(img_list[image_ix])
@@ -86,9 +89,17 @@ for image_ix in range(1):#len(img_list)):
     # collect bounding boxes for each image
     ground_image_bb_gt = image_actions.get_bb_gt(image_name)
 
+    # add current image ground truth to all ground truths
+    all_ground_truth.append(ground_image_bb_gt)
+
+    # collect proposal bounding boxes
+    boundingboxes = []
+
+    #add image proposals to list of all proposals
+    all_proposals.append(boundingboxes)
+
     # initial bounding box (whole image, raw size)
     boundingbox = np.array([[0,0],image_dimensions])
-
 
     # list to store IOU for each object in the image and current bounding box
     IOU_list = []
@@ -109,35 +120,34 @@ for image_ix in range(1):#len(img_list)):
     # get the state vector (conv output of VGG16 concatenated with the action history)
     state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
-    T = 10
+    T = 5
     for t in range(T):
 
         # add the current state to the experience list
-      
+        all_proposals[image_ix].append(boundingbox)
 
         # plug state into Q network
         Q_vals = Q_net.predict(state_vec)
 
         best_action = np.argmax(Q_vals)
 
-        # exploration or exploitation
+       # exploration or exploitation
         if random.uniform(0,1) < epsilon:
-            print('Yes')
-            action = best_action
+            action = random.randint(0, 5)
             
         else:
-            print('no')
-            action = random.randint(0, 5)
+            action = best_action
+
+        print('action:', action)
 
         if action != 5:
             image, boundingbox = action_functions.crop_image(original_image, boundingbox, action)
         else:
             print("This is your object!")
-            # object_loc.append(boundingbox)
 
             for ground_truth in ground_image_bb_gt[1]:
                 current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
-            print(current_iou)
+            print("IOU: ", current_iou)
             break
 
 
@@ -156,3 +166,8 @@ for image_ix in range(1):#len(img_list)):
 
         preprocessed_image = image_actions.image_preprocessing(image)
         state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
+
+
+ix = 9
+
+image_actions.view_results(img_list, all_ground_truth, all_proposals, ix)

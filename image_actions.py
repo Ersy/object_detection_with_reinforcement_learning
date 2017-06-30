@@ -4,7 +4,8 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import cv2
 from keras.applications.vgg16 import preprocess_input
-
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 
 ### Reference values
 class_name_dict = { 'aeroplane':1,
@@ -29,8 +30,8 @@ class_name_dict = { 'aeroplane':1,
 					'tvmonitor':20
 					}
 
-VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
 
+VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
 
 
 def load_images(VOC_path, image_names):
@@ -129,3 +130,30 @@ def image_preprocessing(im):
 	im = np.expand_dims(im, axis=0)
 	im = preprocess_input(im)
 	return im
+
+def view_results(im, groundtruth, proposals, ix):
+	"""
+	takes in an image set, ground truth bounding boxes, proposal bounding boxes, and an image index
+	prints out the image with the bouning boxes drawn in
+	"""
+	im = im[ix]
+	proposals = proposals[ix]
+
+	fig, ax = plt.subplots(1)
+	ax.imshow(im)
+
+	for proposal in proposals:
+	    top_left = (proposal[0,1], proposal[0,0])
+	    width = proposal[1,1] - proposal[0,1]
+	    height = proposal[1,0] - proposal[0,0]
+	    rect = patches.Rectangle(top_left, width, height, linewidth=3, edgecolor='b', facecolor='none')
+	    ax.add_patch(rect)
+
+	for ground_truth_box in groundtruth[ix][1]:
+	    top_left = (ground_truth_box[0,1], ground_truth_box[0,0])
+	    width = ground_truth_box[1,1] - ground_truth_box[0,1]
+	    height = ground_truth_box[1,0] - ground_truth_box[0,0]
+	    rect = patches.Rectangle(top_left, width, height, linewidth=3, edgecolor='r', facecolor='none')
+	    ax.add_patch(rect)
+
+	plt.show()

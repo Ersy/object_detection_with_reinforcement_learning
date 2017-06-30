@@ -1,9 +1,6 @@
 import numpy as np
 import argparse
-import matplotlib
-matplotlib.use("webagg")
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+
 import random
 
 from keras.applications import imagenet_utils
@@ -16,15 +13,11 @@ from keras.callbacks import ModelCheckpoint
 import image_actions
 import reinforcement_helper
 import action_functions
+import get_correct_class_test
 
 ### 
 from keras import backend as K
 K.set_image_dim_ordering('tf')
-
-
-### Vars
-VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
-
 
 
 # parser for the input, defining the number of training epochs and an image
@@ -35,11 +28,16 @@ args = vars(parser.parse_args())
 epochs_id = args['n']
 image = args['image']
 
-
+VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
 
 ### loading up VOC images of a given class
 img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
 img_list = image_actions.load_images(VOC_path, img_name_list) 
+
+
+desired_class = 'aeroplane'
+
+img_list, groundtruths = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
 
 number_of_actions = 6
@@ -50,11 +48,11 @@ Q_net_input_size = (25136, )
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='0')
+Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5')
 
 # setting up callback to save best model
-filepath="best_weights.hdf5"
-checkpoint = ModelCheckpoint(filepath, monitor='mse', verbose=1, save_best_only=True, mode='max')
+filepath="/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5"
+checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
 
@@ -72,7 +70,7 @@ number_of_experiences_to_train_from = 1000
 batch_size = 100
 training_iterations = number_of_experiences_to_train_from/batch_size
 
-training_epochs = 10
+training_epochs = 100
 
 # loop through images
 for episode in range(episodes):
@@ -85,17 +83,17 @@ for episode in range(episodes):
 		epsilon = epsilon -  0.2
 
 	# iteration through all images in the image list
-	for image_ix in range(5):#len(img_list)):
+	for image_ix in range(len(img_list)):
 		
 
 		# get initial parameters for each image
 		original_image = np.array(img_list[image_ix])
 		image = np.array(img_list[image_ix])
-		image_name = img_name_list[image_ix]
+		# image_name = img_name_list[image_ix]
 		image_dimensions = image.shape[:-1]
 
 		# collect bounding boxes for each image
-		ground_image_bb_gt = image_actions.get_bb_gt(image_name)
+		ground_image_bb_gt = groundtruths[image_ix]#image_actions.get_bb_gt(image_name)
 
 		# initial bounding box (whole image, raw size)
 		boundingbox = np.array([[0,0],image_dimensions])
@@ -135,17 +133,20 @@ for episode in range(episodes):
 			# select the action based on the highest Q value
 			best_action = np.argmax(Q_vals)
 
+
 			# if the IOU is greater than 0.6 force the action to be the terminal action
 			# this is done to help speed up the training process
 			if max(image_IOU) > 0.6:
 				best_action = 5
 
+
 			# exploration or exploitation
 			if random.uniform(0,1) < epsilon:
-				action = best_action
+				action = random.randint(0, 5)
 				
 			else:
-				action = random.randint(0, 5)
+				action = best_action
+
 
 			if action != 5:
 				image, boundingbox = action_functions.crop_image(original_image, boundingbox, action)
