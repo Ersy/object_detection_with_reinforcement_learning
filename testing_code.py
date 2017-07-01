@@ -31,6 +31,7 @@ from keras.applications.vgg16 import preprocess_input, VGG16
 import image_actions
 import reinforcement_helper
 import action_functions
+import get_correct_class_test
 
 ### 
 from keras import backend as K
@@ -57,6 +58,10 @@ img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
 
+desired_class = 'aeroplane'
+
+img_list, groundtruths = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
+
 
 number_of_actions = 6
 history_length = 8
@@ -77,7 +82,7 @@ all_proposals = []
 all_ground_truth = []
 
 # loop through images
-for image_ix in range(100):#len(img_list)):
+for image_ix in range(len(img_list)):
     
     print("new image: ", image_ix)
     # get initial parameters for each image
@@ -87,7 +92,7 @@ for image_ix in range(100):#len(img_list)):
     image_dimensions = image.shape[:-1]
 
     # collect bounding boxes for each image
-    ground_image_bb_gt = image_actions.get_bb_gt(image_name)
+    ground_image_bb_gt = groundtruths[image_ix]
 
     # add current image ground truth to all ground truths
     all_ground_truth.append(ground_image_bb_gt)
@@ -106,7 +111,7 @@ for image_ix in range(100):#len(img_list)):
 
     image_IOU = []
     # get the IOU for each object
-    for ground_truth in ground_image_bb_gt[1]:
+    for ground_truth in ground_image_bb_gt:
         current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
         image_IOU.append(current_iou)
     IOU_list.append(image_IOU)
@@ -145,7 +150,7 @@ for image_ix in range(100):#len(img_list)):
         else:
             print("This is your object!")
 
-            for ground_truth in ground_image_bb_gt[1]:
+            for ground_truth in ground_image_bb_gt:
                 current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
             print("IOU: ", current_iou)
             break
@@ -153,7 +158,7 @@ for image_ix in range(100):#len(img_list)):
 
         # measure IOU
         image_IOU = []
-        for ground_truth in ground_image_bb_gt[1]:
+        for ground_truth in ground_image_bb_gt:
             current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
             image_IOU.append(current_iou)
         IOU_list.append(image_IOU)

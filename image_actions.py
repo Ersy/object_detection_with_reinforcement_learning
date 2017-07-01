@@ -149,7 +149,7 @@ def view_results(im, groundtruth, proposals, ix):
 	    rect = patches.Rectangle(top_left, width, height, linewidth=3, edgecolor='b', facecolor='none')
 	    ax.add_patch(rect)
 
-	for ground_truth_box in groundtruth[ix][1]:
+	for ground_truth_box in groundtruth[ix]:
 	    top_left = (ground_truth_box[0,1], ground_truth_box[0,0])
 	    width = ground_truth_box[1,1] - ground_truth_box[0,1]
 	    height = ground_truth_box[1,0] - ground_truth_box[0,0]

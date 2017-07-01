@@ -48,7 +48,7 @@ Q_net_input_size = (25136, )
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5')
+Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='0')
 
 # setting up callback to save best model
 filepath="/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5"
@@ -74,6 +74,7 @@ training_epochs = 100
 
 # loop through images
 for episode in range(episodes):
+	print("this is episode:", episode)
 
 	# list to store experiences, new one for each episode (run through all images with a set epislon value)
 	experiences = []
@@ -104,7 +105,7 @@ for episode in range(episodes):
 
 		image_IOU = []
 		# get the IOU for each object
-		for ground_truth in ground_image_bb_gt[1]:
+		for ground_truth in ground_image_bb_gt:
 			current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
 			image_IOU.append(current_iou)
 		IOU_list.append(image_IOU)
@@ -136,7 +137,7 @@ for episode in range(episodes):
 
 			# if the IOU is greater than 0.6 force the action to be the terminal action
 			# this is done to help speed up the training process
-			if max(image_IOU) > 0.6:
+			if max(image_IOU) > 0.7:
 				best_action = 5
 
 
@@ -147,18 +148,14 @@ for episode in range(episodes):
 			else:
 				action = best_action
 
-
+			# if in training the termination action is used no need to get the subcrop again
 			if action != 5:
 				image, boundingbox = action_functions.crop_image(original_image, boundingbox, action)
-			else:
-				# actions to take if the trigger function is called
-				print('TRIGGERED!')
-				print('IOU:', max(image_IOU))
 
 
 			# measure IOU
 			image_IOU = []
-			for ground_truth in ground_image_bb_gt[1]:
+			for ground_truth in ground_image_bb_gt:
 				current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
 				image_IOU.append(current_iou)
 			IOU_list.append(image_IOU)
