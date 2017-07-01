@@ -30,7 +30,7 @@ from keras.applications.vgg16 import preprocess_input, VGG16
 ### Local helpers
 import image_actions
 import reinforcement_helper
-import action_functions
+import action_functions_v2 as action_functions
 import get_correct_class_test
 
 ### 
@@ -63,14 +63,14 @@ desired_class = 'aeroplane'
 img_list, groundtruths = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
 
-number_of_actions = 6
+number_of_actions = 5
 history_length = 8
-Q_net_input_size = (25136, )
+Q_net_input_size = (25128, )
 
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5')
+Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='test_weights.hdf5')# /media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5')
 
 ### Q network definition
 epsilon = 0
@@ -125,7 +125,7 @@ for image_ix in range(len(img_list)):
     # get the state vector (conv output of VGG16 concatenated with the action history)
     state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
-    T = 5
+    T = 10
     for t in range(T):
 
         # add the current state to the experience list
@@ -138,14 +138,14 @@ for image_ix in range(len(img_list)):
 
        # exploration or exploitation
         if random.uniform(0,1) < epsilon:
-            action = random.randint(0, 5)
+            action = random.randint(0, number_of_actions-1)
             
         else:
             action = best_action
 
         print('action:', action)
 
-        if action != 5:
+        if action != number_of_actions-1:
             image, boundingbox = action_functions.crop_image(original_image, boundingbox, action)
         else:
             print("This is your object!")
@@ -166,7 +166,7 @@ for image_ix in range(len(img_list)):
 
         # update history vector
         history_vec[:, :-1] = history_vec[:,1:]
-        history_vec[:,-1] = [0,0,0,0,0,0] # hard coded actions here
+        history_vec[:,-1] = [0,0,0,0,0] # hard coded actions here
         history_vec[action, -1] = 1
 
         preprocessed_image = image_actions.image_preprocessing(image)

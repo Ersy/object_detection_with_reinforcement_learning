@@ -12,7 +12,7 @@ from keras.callbacks import ModelCheckpoint
 ### Local helpers
 import image_actions
 import reinforcement_helper
-import action_functions
+import action_functions_v2 as action_functions
 import get_correct_class_test
 
 ### 
@@ -40,9 +40,9 @@ desired_class = 'aeroplane'
 img_list, groundtruths = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
 
-number_of_actions = 6
+number_of_actions = 5
 history_length = 8
-Q_net_input_size = (25136, )
+Q_net_input_size = (25128, )
 
 
 ### VGG16 model without top
@@ -57,7 +57,7 @@ callbacks_list = [checkpoint]
 
 
 ### Q network definition
-episodes = 15
+episodes = 20
 
 # random action probability
 epsilon = 0.9
@@ -81,7 +81,7 @@ for episode in range(episodes):
 
 	# change the exploration-eploitation tradeoff as the episode count increases (0.9 to 0.1)
 	if epsilon > 0.1:
-		epsilon = epsilon -  0.2
+		epsilon = epsilon -  0.1
 
 	# iteration through all images in the image list
 	for image_ix in range(len(img_list)):
@@ -122,7 +122,7 @@ for episode in range(episodes):
 		# dumb trick to separate experiences for each image
 		experiences.append([])
 
-		T = 5
+		T = 10
 		for t in range(T):
 
 			# add the current state to the experience list
@@ -137,19 +137,19 @@ for episode in range(episodes):
 
 			# if the IOU is greater than 0.6 force the action to be the terminal action
 			# this is done to help speed up the training process
-			if max(image_IOU) > 0.7:
-				best_action = 5
+			if max(image_IOU) > 0.6:
+				best_action = number_of_actions-1
 
 
 			# exploration or exploitation
 			if random.uniform(0,1) < epsilon:
-				action = random.randint(0, 5)
+				action = random.randint(0, number_of_actions-1)
 				
 			else:
 				action = best_action
 
 			# if in training the termination action is used no need to get the subcrop again
-			if action != 5:
+			if action != number_of_actions-1:
 				image, boundingbox = action_functions.crop_image(original_image, boundingbox, action)
 
 
@@ -167,7 +167,7 @@ for episode in range(episodes):
 
 			# update history vector
 			history_vec[:, :-1] = history_vec[:,1:]
-			history_vec[:,-1] = [0,0,0,0,0,0] # hard coded actions here
+			history_vec[:,-1] = [0,0,0,0,0] # hard coded actions here
 			history_vec[action, -1] = 1
 
 			preprocessed_image = image_actions.image_preprocessing(image)

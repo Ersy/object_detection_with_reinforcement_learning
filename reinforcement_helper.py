@@ -9,7 +9,7 @@ import numpy as np
 # Visual descriptor size
 visual_descriptor_size = 25088
 # Different actions that the agent can do
-number_of_actions = 6
+number_of_actions = 5
 
 # Number of actions in the past to retain
 past_action_val = 8
