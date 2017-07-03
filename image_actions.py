@@ -142,18 +142,21 @@ def view_results(im, groundtruth, proposals, ix):
 	fig, ax = plt.subplots(1)
 	ax.imshow(im)
 
-	for proposal in proposals:
+	num_of_proposals = len(proposals)
+	color = plt.cm.rainbow(np.linspace(0,1,num_of_proposals))
+
+	for proposal, c in zip(proposals, color):
 	    top_left = (proposal[0,1], proposal[0,0])
 	    width = proposal[1,1] - proposal[0,1]
 	    height = proposal[1,0] - proposal[0,0]
-	    rect = patches.Rectangle(top_left, width, height, linewidth=3, edgecolor='b', facecolor='none')
+	    rect = patches.Rectangle(top_left, width, height, linewidth=2, edgecolor=c, facecolor='none')
 	    ax.add_patch(rect)
 
 	for ground_truth_box in groundtruth[ix]:
 	    top_left = (ground_truth_box[0,1], ground_truth_box[0,0])
 	    width = ground_truth_box[1,1] - ground_truth_box[0,1]
 	    height = ground_truth_box[1,0] - ground_truth_box[0,0]
-	    rect = patches.Rectangle(top_left, width, height, linewidth=3, edgecolor='r', facecolor='none')
+	    rect = patches.Rectangle(top_left, width, height, linewidth=2, edgecolor='white', facecolor='none')
 	    ax.add_patch(rect)
 
 	plt.show()

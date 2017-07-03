@@ -220,4 +220,7 @@ for episode in range(episodes):
 		# this takes the initial Q values for the state and replaces only the Q values for the actions that were used to the new target, else the error should be 0
 		initial_Q[np.arange(len(initial_Q)), flat_actions] = target_repeated[np.arange(len(target_repeated)), flat_actions]
 
-		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, callbacks=callbacks_list, validation_split=0.2, verbose=0)
+		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size)#, callbacks=callbacks_list, validation_split=0.2, verbose=0)
+
+
+Q_net.save_weights('these_are_new_weights.hdf5')
