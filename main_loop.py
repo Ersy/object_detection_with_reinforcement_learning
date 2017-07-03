@@ -84,7 +84,7 @@ for episode in range(episodes):
 		epsilon = epsilon -  0.1
 
 	# iteration through all images in the image list
-	for image_ix in range(len(img_list)):
+	for image_ix in range(1):#len(img_list)):
 		
 
 		# get initial parameters for each image
@@ -122,7 +122,7 @@ for episode in range(episodes):
 		# dumb trick to separate experiences for each image
 		experiences.append([])
 
-		T = 10
+		T = 20
 		for t in range(T):
 
 			# add the current state to the experience list
@@ -195,9 +195,13 @@ for episode in range(episodes):
 		# calculating the Q values for the next state
 		next_state = np.array([state[3] for state in random_experiences]).squeeze(1)
 		next_Q = Q_net.predict(next_state, batch_size)
+		
+		# calculating the maximum Q for the next state
+		next_Q_max = next_Q.max(axis=1)
 
 		# get the reward for a given experience
-		random_reward = np.expand_dims(random_experiences[:, 2], 1)
+		# random_reward = np.expand_dims(random_experiences[:, 2], 1)
+		random_reward = random_experiences[:, 2]
 
 		# get the action of a given experience
 		random_actions = np.expand_dims(random_experiences[:, 1], 1)
@@ -205,12 +209,15 @@ for episode in range(episodes):
 
 
 		# target for the current state should be the Q value of the next state - the reward (but only for the chosen action, the rest should be set to 0 - CURRENT NOT IMPLEMENTED)
-		target = np.array(next_Q - random_reward)
+		target = np.array(next_Q_max + random_reward)
 
 		# discount the future reward, i.e the Q value output
 		target = target*gamma
 
+		# repeat the target array to the same size as the initial_Q array (allowing the cost to be limited to the selected actions)
+		target_repeated = np.matlib.repmat(target, 5, 1).T
+
 		# this takes the initial Q values for the state and replaces only the Q values for the actions that were used to the new target, else the error should be 0
-		initial_Q[np.arange(len(initial_Q)), flat_actions] = target[np.arange(len(target)), flat_actions]
+		initial_Q[np.arange(len(initial_Q)), flat_actions] = target_repeated[np.arange(len(target_repeated)), flat_actions]
 
 		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, callbacks=callbacks_list, validation_split=0.2, verbose=0)

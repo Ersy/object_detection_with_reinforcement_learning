@@ -70,7 +70,7 @@ Q_net_input_size = (25128, )
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='test_weights.hdf5')# /media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5')
+Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5')
 
 ### Q network definition
 epsilon = 0
@@ -125,7 +125,7 @@ for image_ix in range(len(img_list)):
     # get the state vector (conv output of VGG16 concatenated with the action history)
     state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
-    T = 10
+    T = 40
     for t in range(T):
 
         # add the current state to the experience list
@@ -173,6 +173,6 @@ for image_ix in range(len(img_list)):
         state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
 
-ix = 9
+ix = 0
 
 image_actions.view_results(img_list, all_ground_truth, all_proposals, ix)
