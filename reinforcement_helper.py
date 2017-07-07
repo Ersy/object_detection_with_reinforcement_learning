@@ -15,8 +15,8 @@ number_of_actions = 5
 past_action_val = 8
 
 movement_reward = 1
-terminal_reward = 3
-iou_threshold = 0.6
+terminal_reward = 100
+iou_threshold = 0.5
 
 
 def get_reward(action, IOU_list, t):
@@ -33,7 +33,7 @@ def get_reward(action, IOU_list, t):
 		current_IOUs = IOU_list[t+1]
 		past_IOUs = IOU_list[t]
 		current_target = np.argmax(current_IOUs)
-		if current_IOUs[current_target] > 0:
+		if current_IOUs[current_target] - past_IOUs[current_target] > 0:
 			return movement_reward
 		else:
 			return -movement_reward
@@ -70,23 +70,48 @@ def get_q_network(shape_of_input, number_of_actions, weights_path='0'):
 	return model
 
 
+# def IOU(bb, bb_gt):
+# 	"""
+# 	Calculates the intersection-over-union for two bounding boxes
+# 	"""
+# 	yA = max(bb[0,0], bb_gt[0,0])
+# 	xA = max(bb[0,1], bb_gt[0,1])
+# 	yB = min(bb[1,0], bb_gt[1,0])
+# 	xB = min(bb[1,1], bb_gt[1,1])
+
+# 	interArea = (xB - xA + 1) * (yB - yA + 1)
+
+# 	bb_Area = (bb[1,0] - bb[0,0] + 1) * (bb[1,1] - bb[0,1] + 1)
+# 	bb_gt_Area = (bb_gt[1,0] - bb_gt[0,0] + 1) * (bb_gt[1,1] - bb_gt[0,1] + 1)
+
+# 	iou = interArea / float(bb_Area + bb_gt_Area - interArea)
+# 	if iou < 0:
+# 		return 0
+# 	return iou
+
+
+
+
 def IOU(bb, bb_gt):
 	"""
 	Calculates the intersection-over-union for two bounding boxes
 	"""
-	yA = max(bb[0,0], bb_gt[0,0])
-	xA = max(bb[0,1], bb_gt[0,1])
-	yB = min(bb[1,0], bb_gt[1,0])
-	xB = min(bb[1,1], bb_gt[1,1])
+	x1 = max(bb[0,1], bb_gt[0,1])
+	y1 = max(bb[0,0], bb_gt[0,0])
+	x2 = min(bb[1,1], bb_gt[1,1])
+	y2 = min(bb[1,0], bb_gt[1,0])
 
-	interArea = (xB - xA + 1) * (yB - yA + 1)
+	w = x2-x1+1
+	h = y2-y1+1
 
-	bb_Area = (bb[1,0] - bb[0,0] + 1) * (bb[1,1] - bb[0,1] + 1)
-	bb_gt_Area = (bb_gt[1,0] - bb_gt[0,0] + 1) * (bb_gt[1,1] - bb_gt[0,1] + 1)
-
-	iou = interArea / float(bb_Area + bb_gt_Area - interArea)
+	inter = w*h
+	
+	aarea = (bb[1,1]-bb[0,1]+1) * (bb[1,0]-bb[0,0]+1)
+	
+	barea = (bb_gt[1,1]-bb_gt[0,1]+1) * (bb_gt[1,0]-bb_gt[0,0]+1)
+	# intersection over union overlap
+	iou = np.float32(inter) / (aarea+barea-inter)
+	# set invalid entries to 0 overlap
 	if iou < 0:
 		return 0
 	return iou
-
-

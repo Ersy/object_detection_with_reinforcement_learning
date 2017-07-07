@@ -37,7 +37,7 @@ import get_correct_class_test
 from keras import backend as K
 K.set_image_dim_ordering('tf')
 
-
+    
 ### Vars
 VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
 
@@ -55,12 +55,13 @@ image = args['image']
 
 ### loading up VOC images of a given class
 img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
+#img_name_list = [img_name_list[2]] *2
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
 
 desired_class = 'aeroplane'
 
-img_list, groundtruths = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
+img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
 
 number_of_actions = 5
@@ -70,8 +71,8 @@ Q_net_input_size = (25128, )
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-weights = '/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5'
-#weights = 'these_are_some_weights.hdf5'
+#weights = '/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/060717_04_overfit.hdf5'
+weights = 'no_val_weights_060717_02.hdf5'
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
 
@@ -86,8 +87,11 @@ all_ground_truth = []
 
 all_IOU = []
 
+# IOU for terminal actions - for use in calulating evaluation stats
+terminal_IOU = []
+
 # loop through images
-for image_ix in range(1):#len(img_list)):
+for image_ix in range(len(img_list)):
     
     print("new image: ", image_ix)
     # get initial parameters for each image
@@ -130,7 +134,7 @@ for image_ix in range(1):#len(img_list)):
     # get the state vector (conv output of VGG16 concatenated with the action history)
     state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
-    T = 40
+    T = 30
     for t in range(T):
 
         # add the current state to the experience list
@@ -144,7 +148,6 @@ for image_ix in range(1):#len(img_list)):
        # exploration or exploitation
         if random.uniform(0,1) < epsilon:
             action = random.randint(0, number_of_actions-1)
-            
         else:
             action = best_action
 
@@ -155,11 +158,15 @@ for image_ix in range(1):#len(img_list)):
         else:
             print("This is your object!")
 
+
+            current_image_IOU = []
             for ground_truth in ground_image_bb_gt:
                 current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
+                current_image_IOU.append(current_iou)
             print("IOU: ", current_iou)
-            break
 
+            terminal_IOU.append(max(current_image_IOU))
+            break
 
         # measure IOU
         image_IOU = []
@@ -167,7 +174,6 @@ for image_ix in range(1):#len(img_list)):
             current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
             image_IOU.append(current_iou)
         IOU_list.append(image_IOU)
-
 
         # update history vector
         history_vec[:, :-1] = history_vec[:,1:]
@@ -180,10 +186,22 @@ for image_ix in range(1):#len(img_list)):
     # add the IOU calculated for each proposal for each image for evaluation purposes
     all_IOU.append(IOU_list)
 
-
-
-
 # lets the proposals and ground truth bounding boxes be visualised
 ix = 0
 
 image_actions.view_results(img_list, all_ground_truth, all_proposals, ix)
+
+
+# simple evaluation metric
+detected = sum([i>0.5 for i in terminal_IOU])
+total = float(len(terminal_IOU))
+accuracy = detected/total
+print("total accuracy = ", accuracy)
+
+"""
+for IOU in all_IOU:
+    for ii in IOU:
+        best = max(ii)
+"""
+
+# 223 180 176 174 141 101 87 69 64 55 41

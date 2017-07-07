@@ -1,5 +1,6 @@
 import numpy as np
 import argparse
+import csv
 
 import random
 
@@ -34,11 +35,13 @@ VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Projec
 img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
-
 desired_class = 'aeroplane'
 
-img_list, groundtruths = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
+img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
+# force just the first image to be used
+img_list = [img_list[0]] *100
+groundtruths = [groundtruths[0]] *100
 
 number_of_actions = 5
 history_length = 8
@@ -48,16 +51,18 @@ Q_net_input_size = (25128, )
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='0')
+
+loaded_weights = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/10_epoch_weights_060717_02.hdf5"
+Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='0')#loaded_weights)
 
 # setting up callback to save best model
-filepath="/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/best_weights.hdf5"
+filepath="/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/060717_04_overfit.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
 
 ### Q network definition
-episodes = 20
+episodes = 15
 
 # random action probability
 epsilon = 0.9
@@ -84,13 +89,12 @@ for episode in range(episodes):
 		epsilon = epsilon -  0.1
 
 	# iteration through all images in the image list
-	for image_ix in range(1):#len(img_list)):
-		
+	for image_ix in range(len(img_list)):
+		print("image", image_ix)
 
 		# get initial parameters for each image
 		original_image = np.array(img_list[image_ix])
 		image = np.array(img_list[image_ix])
-		# image_name = img_name_list[image_ix]
 		image_dimensions = image.shape[:-1]
 
 		# collect bounding boxes for each image
@@ -104,7 +108,7 @@ for episode in range(episodes):
 		IOU_list = []
 
 		image_IOU = []
-		# get the IOU for each object
+		# get the initial IOU for each object
 		for ground_truth in ground_image_bb_gt:
 			current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
 			image_IOU.append(current_iou)
@@ -122,8 +126,9 @@ for episode in range(episodes):
 		# dumb trick to separate experiences for each image
 		experiences.append([])
 
-		T = 20
+		T = 10
 		for t in range(T):
+			print('step', t)
 
 			# add the current state to the experience list
 			experiences[image_ix].append([state_vec])
@@ -135,18 +140,18 @@ for episode in range(episodes):
 			best_action = np.argmax(Q_vals)
 
 
-			# if the IOU is greater than 0.6 force the action to be the terminal action
+			# if the IOU is greater than 0.5 force the action to be the terminal action
 			# this is done to help speed up the training process
-			if max(image_IOU) > 0.6:
-				best_action = number_of_actions-1
-
+			if max(image_IOU) > 0.5:
+				action = number_of_actions-1
 
 			# exploration or exploitation
-			if random.uniform(0,1) < epsilon:
+			elif random.uniform(0,1) < epsilon:
 				action = random.randint(0, number_of_actions-1)
 				
 			else:
 				action = best_action
+
 
 			# if in training the termination action is used no need to get the subcrop again
 			if action != number_of_actions-1:
@@ -179,6 +184,8 @@ for episode in range(episodes):
 			experiences[image_ix][t].append(state_vec)
 
 
+
+
 	# Actual training per given episode over a set number of experiences (training iterations)
 	for train_iteration in range(training_iterations):
 		# flatten the experiences list for learning
@@ -207,12 +214,11 @@ for episode in range(episodes):
 		random_actions = np.expand_dims(random_experiences[:, 1], 1)
 		flat_actions = [x for l in random_actions for x in l]
 
-
-		# target for the current state should be the Q value of the next state - the reward (but only for the chosen action, the rest should be set to 0 - CURRENT NOT IMPLEMENTED)
-		target = np.array(next_Q_max + random_reward)
-
 		# discount the future reward, i.e the Q value output
-		target = target*gamma
+		target = np.array(next_Q_max) * gamma
+
+		# target for the current state should be the Q value of the next state - the reward 
+		target = target + random_reward
 
 		# repeat the target array to the same size as the initial_Q array (allowing the cost to be limited to the selected actions)
 		target_repeated = np.matlib.repmat(target, 5, 1).T
@@ -220,7 +226,7 @@ for episode in range(episodes):
 		# this takes the initial Q values for the state and replaces only the Q values for the actions that were used to the new target, else the error should be 0
 		initial_Q[np.arange(len(initial_Q)), flat_actions] = target_repeated[np.arange(len(target_repeated)), flat_actions]
 
-		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size)#, callbacks=callbacks_list, validation_split=0.2, verbose=0)
+		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, callbacks=callbacks_list, validation_split=0.2, verbose=0)
 
 
-Q_net.save_weights('these_are_new_weights.hdf5')
+Q_net.save_weights('no_val_060717_04_overfit.hdf5.hdf5')
