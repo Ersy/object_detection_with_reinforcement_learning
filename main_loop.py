@@ -40,8 +40,8 @@ desired_class = 'aeroplane'
 img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
 # force just the first image to be used
-img_list = [img_list[0]] *100
-groundtruths = [groundtruths[0]] *100
+#img_list = [img_list[0]] *100
+#groundtruths = [groundtruths[0]] *100
 
 number_of_actions = 5
 history_length = 8
@@ -56,13 +56,13 @@ loaded_weights = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='0')#loaded_weights)
 
 # setting up callback to save best model
-filepath="/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/060717_04_overfit.hdf5"
+filepath="/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/080717_01.hdf5"
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
 
 ### Q network definition
-episodes = 15
+episodes = 30
 
 # random action probability
 epsilon = 0.9
@@ -126,9 +126,8 @@ for episode in range(episodes):
 		# dumb trick to separate experiences for each image
 		experiences.append([])
 
-		T = 10
+		T = 20
 		for t in range(T):
-			print('step', t)
 
 			# add the current state to the experience list
 			experiences[image_ix].append([state_vec])
@@ -229,4 +228,4 @@ for episode in range(episodes):
 		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, callbacks=callbacks_list, validation_split=0.2, verbose=0)
 
 
-Q_net.save_weights('no_val_060717_04_overfit.hdf5.hdf5')
+Q_net.save_weights('no_val_080717_01.hdf5')

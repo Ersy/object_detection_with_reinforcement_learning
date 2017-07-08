@@ -71,8 +71,8 @@ Q_net_input_size = (25128, )
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-#weights = '/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/060717_04_overfit.hdf5'
-weights = 'no_val_weights_060717_02.hdf5'
+#weights = '/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/080717_01.hdf5'
+weights = 'no_val_080717_01.hdf5'
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
 

@@ -15,7 +15,7 @@ number_of_actions = 5
 past_action_val = 8
 
 movement_reward = 1
-terminal_reward = 100
+terminal_reward = 10
 iou_threshold = 0.5
 
 
@@ -115,3 +115,18 @@ def IOU(bb, bb_gt):
 	if iou < 0:
 		return 0
 	return iou
+
+"""
+import cv2
+
+
+def calculate_iou(img_mask, gt_mask):
+    gt_mask *= 1.0
+    img_and = cv2.bitwise_and(img_mask, gt_mask)
+    img_or = cv2.bitwise_or(img_mask, gt_mask)
+    j = np.count_nonzero(img_and)
+    i = np.count_nonzero(img_or)
+    iou = float(float(j)/float(i))
+    return iou
+
+ """
