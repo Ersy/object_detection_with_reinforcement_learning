@@ -23,6 +23,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import random
+import os
+
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
@@ -37,11 +39,10 @@ import get_correct_class_test
 from keras import backend as K
 K.set_image_dim_ordering('tf')
 
-    
 ### Vars
 VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
 
-
+VOC_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007'
 
 # parser for the input, defining the number of training epochs and an image
 parser = argparse.ArgumentParser(description = 'Epoch: ')
@@ -54,7 +55,7 @@ image = args['image']
 
 
 ### loading up VOC images of a given class
-img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
+img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_test')
 #img_name_list = [img_name_list[2]] *2
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
@@ -71,8 +72,11 @@ Q_net_input_size = (25128, )
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-#weights = '/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/080717_01.hdf5'
-weights = 'no_val_080717_01.hdf5'
+#weights = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/100717_01.hdf5'
+
+weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
+
+weights = weights_path+'no_val_100717_01.hdf5'
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
 
@@ -134,7 +138,7 @@ for image_ix in range(len(img_list)):
     # get the state vector (conv output of VGG16 concatenated with the action history)
     state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
-    T = 30
+    T = 50
     for t in range(T):
 
         # add the current state to the experience list
@@ -194,9 +198,14 @@ image_actions.view_results(img_list, all_ground_truth, all_proposals, ix)
 
 # simple evaluation metric
 detected = sum([i>0.5 for i in terminal_IOU])
-total = float(len(terminal_IOU))
-accuracy = detected/total
-print("total accuracy = ", accuracy)
+termination_total = float(len(terminal_IOU))
+termination_accuracy = detected/termination_total
+print("termination accuracy = ", termination_accuracy)
+
+flat_objects = [x for l in groundtruths for x in l]
+total_objects = float(len(flat_objects))
+total_accuracy = detected/total_objects
+print('total accuracy = ', total_accuracy)
 
 """
 for IOU in all_IOU:

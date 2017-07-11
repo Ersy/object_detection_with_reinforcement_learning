@@ -4,7 +4,7 @@ import numpy as np
 action_dict = {0:'right',1:'down',2:'left',3:'up'}
 
 # amount to update the corner positions by for each step
-update_step = 0.1
+update_step = 0.05
 
 def TL_right(bb):
 	"""moves the top corner to the right"""

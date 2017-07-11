@@ -15,15 +15,15 @@ number_of_actions = 5
 past_action_val = 8
 
 movement_reward = 1
-terminal_reward = 10
-iou_threshold = 0.5
+terminal_reward = 3
+iou_threshold = 0.6
 
 
 def get_reward(action, IOU_list, t):
 	"""
 	generates the correct reward based on the result of the chosen action
 	"""
-	if action == 5:
+	if action == number_of_actions-1:
 		if max(IOU_list[t+1]) > iou_threshold:
 			return terminal_reward
 		else:

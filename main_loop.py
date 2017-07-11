@@ -20,7 +20,6 @@ import get_correct_class_test
 from keras import backend as K
 K.set_image_dim_ordering('tf')
 
-
 # parser for the input, defining the number of training epochs and an image
 parser = argparse.ArgumentParser(description = 'Epoch: ')
 parser.add_argument('-n', metavar='N', type=int, default=0)
@@ -29,7 +28,8 @@ args = vars(parser.parse_args())
 epochs_id = args['n']
 image = args['image']
 
-VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
+project_root = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/'
+VOC_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2007'
 
 ### loading up VOC images of a given class
 img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
@@ -38,10 +38,6 @@ img_list = image_actions.load_images(VOC_path, img_name_list)
 desired_class = 'aeroplane'
 
 img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
-
-# force just the first image to be used
-#img_list = [img_list[0]] *100
-#groundtruths = [groundtruths[0]] *100
 
 number_of_actions = 5
 history_length = 8
@@ -52,17 +48,20 @@ Q_net_input_size = (25128, )
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 
-loaded_weights = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/10_epoch_weights_060717_02.hdf5"
-Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path='0')#loaded_weights)
+# initialise Q network (randomly or with existing weights)
+loaded_weights_name = '090717_03.hdf5'
+loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
+loaded_weights = '0'
+Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-filepath="/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/080717_01.hdf5"
+saved_weights = '100717_01.hdf5'
+filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
-
 ### Q network definition
-episodes = 30
+episodes = 50
 
 # random action probability
 epsilon = 0.9
@@ -73,7 +72,7 @@ gamma = 0.9
 # set the number of experiences to train from for each episode and batch size
 number_of_experiences_to_train_from = 1000
 batch_size = 100
-training_iterations = number_of_experiences_to_train_from/batch_size
+training_iterations = int(number_of_experiences_to_train_from/batch_size)
 
 training_epochs = 100
 
@@ -85,7 +84,7 @@ for episode in range(episodes):
 	experiences = []
 
 	# change the exploration-eploitation tradeoff as the episode count increases (0.9 to 0.1)
-	if epsilon > 0.1:
+	if epsilon > 0.11:
 		epsilon = epsilon -  0.1
 
 	# iteration through all images in the image list
@@ -102,7 +101,6 @@ for episode in range(episodes):
 
 		# initial bounding box (whole image, raw size)
 		boundingbox = np.array([[0,0],image_dimensions])
-
 
 		# list to store IOU for each object in the image and current bounding box
 		IOU_list = []
@@ -126,7 +124,7 @@ for episode in range(episodes):
 		# dumb trick to separate experiences for each image
 		experiences.append([])
 
-		T = 20
+		T = 40
 		for t in range(T):
 
 			# add the current state to the experience list
@@ -147,7 +145,6 @@ for episode in range(episodes):
 			# exploration or exploitation
 			elif random.uniform(0,1) < epsilon:
 				action = random.randint(0, number_of_actions-1)
-				
 			else:
 				action = best_action
 
@@ -181,9 +178,6 @@ for episode in range(episodes):
 			experiences[image_ix][t].append(action)
 			experiences[image_ix][t].append(reward)
 			experiences[image_ix][t].append(state_vec)
-
-
-
 
 	# Actual training per given episode over a set number of experiences (training iterations)
 	for train_iteration in range(training_iterations):
@@ -227,5 +221,18 @@ for episode in range(episodes):
 
 		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, callbacks=callbacks_list, validation_split=0.2, verbose=0)
 
+no_val_weights = 'no_val_100717_01.hdf5'
+Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'+no_val_weights)
 
-Q_net.save_weights('no_val_080717_01.hdf5')
+
+
+
+# Log of training parameters
+log_location = project_root + 'project_code/network_weights/logs/'
+
+with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
+    	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+	details.writerow(['loaded_weights','episodes', 'epsilon','gamma', 'T', 'movement_reward', 'terminal_reward', 'iou_threshold', 'update_step'])	
+	details.writerow([loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,reinforcement_helper.terminal_reward,reinforcement_helper.iou_threshold, action_functions.update_step])
+    
+

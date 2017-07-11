@@ -32,7 +32,7 @@ class_name_dict = { 'aeroplane':1,
 
 
 VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
-
+VOC_path = "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
 
 def load_images(VOC_path, image_names):
 	"""
