@@ -49,13 +49,13 @@ vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 
 # initialise Q network (randomly or with existing weights)
-loaded_weights_name = '090717_03.hdf5'
-loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
+#loaded_weights_name = '090717_03.hdf5'
+#loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
 loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = '100717_01.hdf5'
+saved_weights = 'aeroplane_120717_01.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
@@ -124,7 +124,7 @@ for episode in range(episodes):
 		# dumb trick to separate experiences for each image
 		experiences.append([])
 
-		T = 40
+		T = 30
 		for t in range(T):
 
 			# add the current state to the experience list
@@ -221,10 +221,7 @@ for episode in range(episodes):
 
 		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, callbacks=callbacks_list, validation_split=0.2, verbose=0)
 
-no_val_weights = 'no_val_100717_01.hdf5'
-Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'+no_val_weights)
-
-
+Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'+saved_weights)
 
 
 # Log of training parameters
@@ -232,7 +229,7 @@ log_location = project_root + 'project_code/network_weights/logs/'
 
 with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
     	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-	details.writerow(['loaded_weights','episodes', 'epsilon','gamma', 'T', 'movement_reward', 'terminal_reward', 'iou_threshold', 'update_step'])	
+	details.writerow(['loaded_weights','episodes', 'epsilon','gamma', 'Time_steps', 'movement_reward', 'terminal_reward', 'iou_threshold', 'update_step'])	
 	details.writerow([loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,reinforcement_helper.terminal_reward,reinforcement_helper.iou_threshold, action_functions.update_step])
     
 
