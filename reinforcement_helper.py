@@ -15,7 +15,7 @@ number_of_actions = 5
 past_action_val = 8
 
 movement_reward = 1
-terminal_reward = 3
+terminal_reward = 5
 iou_threshold = 0.6
 
 
