@@ -35,12 +35,12 @@ image = args['image']
 
 
 ### loading up VOC images of a given class
-class_file = 'person_trainval'
+class_file = 'aeroplane_trainval'
 img_name_list = image_actions.get_img_names(VOC_path, class_file)
 #img_name_list = [img_name_list[2]] *2
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
-desired_class = 'person'
+desired_class = 'aeroplane'
 
 img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
@@ -52,12 +52,13 @@ Q_net_input_size = (25128, )
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-#weights = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/100717_01.hdf5'
+# path for non validated set
+weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
 
-weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
+#weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'person_100717_01.hdf5'
+saved_weights = 'aeroplane_120717_01.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -75,6 +76,7 @@ all_IOU = []
 
 # IOU for terminal actions - for use in calulating evaluation stats
 terminal_IOU = []
+terminal_IOU_index = []
 
 # loop through images
 for image_ix in range(len(img_list)):
@@ -152,6 +154,7 @@ for image_ix in range(len(img_list)):
             print("IOU: ", current_iou)
 
             terminal_IOU.append(max(current_image_IOU))
+            terminal_IOU_index.append(image_ix)
             break
 
         # measure IOU
