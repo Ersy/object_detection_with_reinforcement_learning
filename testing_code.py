@@ -35,7 +35,7 @@ image = args['image']
 
 
 ### loading up VOC images of a given class
-class_file = 'person_test'
+class_file = 'person_trainval'
 img_name_list = image_actions.get_img_names(VOC_path, class_file)
 #img_name_list = [img_name_list[2]] *2
 img_list = image_actions.load_images(VOC_path, img_name_list) 
@@ -58,7 +58,7 @@ weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final P
 #weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'person_130717_01.hdf5'
+saved_weights = 'person_140717_02.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -122,9 +122,6 @@ for image_ix in range(len(img_list)):
     # get the state vector (conv output of VGG16 concatenated with the action history)
     state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
-    # initialising the highest terminal value
-    highest_terminal_Q = -999 
-
     T = 30
     for t in range(T):
 
@@ -133,7 +130,6 @@ for image_ix in range(len(img_list)):
 
         # plug state into Q network
         Q_vals = Q_net.predict(state_vec)
-
 
         best_action = np.argmax(Q_vals)
 
@@ -211,9 +207,6 @@ for img in IOU_above_cutoff:
     plt.xlabel('action number')
     plt.ylabel('IOU')
 plt.show()
-
-
-
 
 
 

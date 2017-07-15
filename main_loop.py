@@ -8,7 +8,7 @@ from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
 
 from keras.callbacks import ModelCheckpoint
-
+import cPickle
 
 ### Local helpers
 import image_actions
@@ -32,10 +32,10 @@ project_root = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final P
 VOC_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2007'
 
 ### loading up VOC images of a given class
-img_name_list = image_actions.get_img_names(VOC_path, 'person_trainval')
+img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
-desired_class = 'person'
+desired_class = 'aeroplane'
 
 img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
@@ -55,7 +55,7 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'person_140717_02.hdf5'
+saved_weights = 'aeroplane_150717_01.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
@@ -70,7 +70,7 @@ epsilon = 0.9
 gamma = 0.9
 
 # set the number of experiences to train from for each episode and batch size
-number_of_experiences_to_train_from = 1000
+number_of_experiences_to_train_from = 5000
 batch_size = 100
 training_iterations = int(number_of_experiences_to_train_from/batch_size)
 
@@ -80,7 +80,7 @@ training_epochs = 100
 T = 30
 
 # image data splits - lowers memory consumption per episode by only processing a subset at a time
-chunk_factor = 10
+chunk_factor = 1
 chunk_size = int(len(img_list)/chunk_factor)
 
 # loop through images
@@ -144,13 +144,6 @@ for episode in range(episodes):
 				# add the current state to the experience list
 				experiences[image_ix - chunk_offset].append([state_vec])
 
-				# plug state into Q network
-				Q_vals = Q_net.predict(state_vec)
-
-				# select the action based on the highest Q value
-				best_action = np.argmax(Q_vals)
-
-
 				# if the IOU is greater than 0.5 force the action to be the terminal action
 				# this is done to help speed up the training process
 				if max(image_IOU) > 0.5:
@@ -160,7 +153,10 @@ for episode in range(episodes):
 				elif random.uniform(0,1) < epsilon:
 					action = random.randint(0, number_of_actions-1)
 				else:
-					action = best_action
+					# plug state into Q network
+					Q_vals = Q_net.predict(state_vec)
+					# select the action based on the highest Q value
+					action = np.argmax(Q_vals)
 
 
 				# if in training the termination action is used no need to get the subcrop again
@@ -192,6 +188,11 @@ for episode in range(episodes):
 				experiences[image_ix-chunk_offset][t].append(action)
 				experiences[image_ix-chunk_offset][t].append(reward)
 				experiences[image_ix-chunk_offset][t].append(state_vec)
+
+		pickle_path = "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/episodes/"
+
+		with open(pickle_path+saved_weights+chunk+'.pickle') as pickle_file:
+			cPickle.dump(episodes, pickle_file, protocol=cPickle.HIGHEST_PROTOCOL)
 
 		# Actual training per given episode over a set number of experiences (training iterations)
 		for train_iteration in range(training_iterations):
