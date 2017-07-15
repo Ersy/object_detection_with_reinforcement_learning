@@ -35,12 +35,12 @@ image = args['image']
 
 
 ### loading up VOC images of a given class
-class_file = 'aeroplane_trainval'
+class_file = 'person_test'
 img_name_list = image_actions.get_img_names(VOC_path, class_file)
 #img_name_list = [img_name_list[2]] *2
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
-desired_class = 'aeroplane'
+desired_class = 'person'
 
 img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
@@ -58,7 +58,7 @@ weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final P
 #weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'aeroplane_120717_01.hdf5'
+saved_weights = 'person_130717_01.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -122,6 +122,9 @@ for image_ix in range(len(img_list)):
     # get the state vector (conv output of VGG16 concatenated with the action history)
     state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
+    # initialising the highest terminal value
+    highest_terminal_Q = -999 
+
     T = 30
     for t in range(T):
 
@@ -130,6 +133,7 @@ for image_ix in range(len(img_list)):
 
         # plug state into Q network
         Q_vals = Q_net.predict(state_vec)
+
 
         best_action = np.argmax(Q_vals)
 
@@ -192,11 +196,31 @@ total_objects = float(len(flat_objects))
 total_accuracy = detected/total_objects
 print('total accuracy = ', total_accuracy)
 
+# obtain the accuracy for the final proposal bounding box (regardless of whether the terminal action is triggered)
+final_proposal_IOU = [max(i[-1]) for i in all_IOU]
+final_proposal_detected = sum([i>0.5 for i in final_proposal_IOU])
+final_proposal_accuracy = final_proposal_detected/total_objects
+print('final proposal accuracy = ', final_proposal_accuracy)
+
+
+# code for investigating actions taken for different images - assessing the agent performance
+IOU_above_cutoff = [i for i in all_IOU if any(j[0]>0.5 for j in i)]
+
+for img in IOU_above_cutoff:
+    plt.plot(img)
+    plt.xlabel('action number')
+    plt.ylabel('IOU')
+plt.show()
+
+
+
+
+
 
 # Log of training parameters
 log_location = project_root + 'project_code/network_weights/logs/'
 
-with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
+with open(log_location+saved_weights + '.csv', 'a') as csvfile:
     	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
 	details.writerow(['class_file', 'Time_steps', 'termination_accuracy', 'total_accuracy'])	
 	details.writerow([class_file, T, termination_accuracy, total_accuracy])

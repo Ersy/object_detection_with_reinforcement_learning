@@ -55,13 +55,13 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'person_130717_01.hdf5'
+saved_weights = 'person_140717_02.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
 ### Q network definition
-episodes = 30
+episodes = 50
 
 # random action probability
 epsilon = 0.9
@@ -95,7 +95,7 @@ for episode in range(episodes):
 
 		# change the exploration-eploitation tradeoff as the episode count increases (0.9 to 0.1)
 		if epsilon > 0.11:
-			epsilon = epsilon -  0.1
+			epsilon = epsilon -  0.05
 
 
 		# determines the offset to use when iterating through the chunk
