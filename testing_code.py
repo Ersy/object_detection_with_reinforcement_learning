@@ -35,12 +35,12 @@ image = args['image']
 
 
 ### loading up VOC images of a given class
-class_file = 'person_trainval'
+class_file = 'aeroplane_trainval'
 img_name_list = image_actions.get_img_names(VOC_path, class_file)
 #img_name_list = [img_name_list[2]] *2
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
-desired_class = 'person'
+desired_class = 'aeroplane'
 
 img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
@@ -58,7 +58,7 @@ weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final P
 #weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'person_140717_02.hdf5'
+saved_weights = 'aeroplane_160717_01.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)

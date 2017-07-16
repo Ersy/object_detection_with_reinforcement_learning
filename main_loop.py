@@ -55,13 +55,13 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'aeroplane_150717_01.hdf5'
+saved_weights = 'aeroplane_160717_01.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
 ### Q network definition
-episodes = 50
+episodes = 30
 
 # random action probability
 epsilon = 0.9
@@ -95,7 +95,7 @@ for episode in range(episodes):
 
 		# change the exploration-eploitation tradeoff as the episode count increases (0.9 to 0.1)
 		if epsilon > 0.11:
-			epsilon = epsilon -  0.05
+			epsilon = epsilon -  0.1
 
 
 		# determines the offset to use when iterating through the chunk
@@ -189,10 +189,10 @@ for episode in range(episodes):
 				experiences[image_ix-chunk_offset][t].append(reward)
 				experiences[image_ix-chunk_offset][t].append(state_vec)
 
-		pickle_path = "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/episodes/"
+		# pickle_path = "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/episodes/"
 
-		with open(pickle_path+saved_weights+chunk+'.pickle') as pickle_file:
-			cPickle.dump(episodes, pickle_file, protocol=cPickle.HIGHEST_PROTOCOL)
+		# with open(pickle_path+saved_weights+str(chunk)+'.pickle') as pickle_file:
+		# 	cPickle.dump(episodes, pickle_file, protocol=cPickle.HIGHEST_PROTOCOL)
 
 		# Actual training per given episode over a set number of experiences (training iterations)
 		for train_iteration in range(training_iterations):
@@ -222,6 +222,11 @@ for episode in range(episodes):
 			random_actions = np.expand_dims(random_experiences[:, 1], 1)
 			flat_actions = [x for l in random_actions for x in l]
 
+			# collect the indexes of terminal actions and set next state Q value to 0
+			# if the terminal action is selected the episode ends and there should be no additional reward
+			terminal_indices = [i for i, x in enumerate(flat_actions) if x == number_of_actions-1]
+			next_Q_max[terminal_indices] = 0
+
 			# discount the future reward, i.e the Q value output
 			target = np.array(next_Q_max) * gamma
 
@@ -244,7 +249,7 @@ log_location = project_root + 'project_code/network_weights/logs/'
 
 with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
     	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-	details.writerow(['loaded_weights','episodes', 'epsilon','gamma', 'Time_steps', 'movement_reward', 'terminal_reward', 'iou_threshold', 'update_step'])	
-	details.writerow([loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,reinforcement_helper.terminal_reward,reinforcement_helper.iou_threshold, action_functions.update_step])
+	details.writerow(['loaded_weights','episodes', 'epsilon','gamma', 'Time_steps', 'movement_reward', 'terminal_reward', 'iou_threshold', 'update_step', 'experiences_trained_over'])	
+	details.writerow([loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,reinforcement_helper.terminal_reward,reinforcement_helper.iou_threshold, action_functions.update_step, number_of_experiences_to_train_from])
     
 
