@@ -58,7 +58,7 @@ weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final P
 #weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'aeroplane_160717_01.hdf5'
+saved_weights = 'aeroplane_170717_01.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)

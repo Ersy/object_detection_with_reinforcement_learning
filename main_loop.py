@@ -15,6 +15,7 @@ import image_actions
 import reinforcement_helper
 import action_functions_v2 as action_functions
 import get_correct_class_test
+import image_augmentation
 
 ### 
 from keras import backend as K
@@ -55,23 +56,23 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'aeroplane_160717_01.hdf5'
+saved_weights = 'aeroplane_170717_02_test.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
 ### Q network definition
-episodes = 30
+episodes = 50
 
 # random action probability
-epsilon = 0.9
+epsilon = 1
 
 # discount factor for future rewards
 gamma = 0.9
 
 # set the number of experiences to train from for each episode and batch size
 number_of_experiences_to_train_from = 5000
-batch_size = 100
+batch_size = 5000
 training_iterations = int(number_of_experiences_to_train_from/batch_size)
 
 training_epochs = 100
@@ -113,6 +114,12 @@ for episode in range(episodes):
 			# collect bounding boxes for each image
 			ground_image_bb_gt = groundtruths[image_ix]#image_actions.get_bb_gt(image_name)
 
+			# data augmentation -> 0.5 probability of flipping image horizontally
+			augment = bool(random.getrandbits(1))
+			if augment:
+				original_image, ground_image_bb_gt = image_augmentation.flip_image(original_image, ground_image_bb_gt)
+				image = np.fliplr(image)
+
 			# initial bounding box (whole image, raw size)
 			boundingbox = np.array([[0,0],image_dimensions])
 
@@ -144,14 +151,15 @@ for episode in range(episodes):
 				# add the current state to the experience list
 				experiences[image_ix - chunk_offset].append([state_vec])
 
-				# if the IOU is greater than 0.5 force the action to be the terminal action
-				# this is done to help speed up the training process
-				if max(image_IOU) > 0.5:
-					action = number_of_actions-1
+
 
 				# exploration or exploitation
-				elif random.uniform(0,1) < epsilon:
+				if random.uniform(0,1) < epsilon:
 					action = random.randint(0, number_of_actions-1)
+				# if the IOU is greater than 0.5 force the action to be the terminal action
+				# this is done to help speed up the training process
+				elif max(image_IOU) > 0.6:
+					action = number_of_actions-1
 				else:
 					# plug state into Q network
 					Q_vals = Q_net.predict(state_vec)
