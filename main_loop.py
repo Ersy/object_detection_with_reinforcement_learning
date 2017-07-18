@@ -30,15 +30,35 @@ epochs_id = args['n']
 image = args['image']
 
 project_root = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/'
-VOC_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2007'
+VOC2007_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2007'
+VOC2012_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2012'
 
-### loading up VOC images of a given class
-img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
-img_list = image_actions.load_images(VOC_path, img_name_list) 
-
+desired_class_set = 'aeroplane_trainval'
 desired_class = 'aeroplane'
 
-img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
+### loading up VOC2007 images of a given class
+img_name_list_2007 = image_actions.get_img_names(VOC2007_path, desired_class_set)
+img_list_2007 = image_actions.load_images(VOC2007_path, img_name_list_2007) 
+img_list_2007, groundtruths_2007, img_name_list_2007 = get_correct_class_test.get_class_images(VOC2007_path, desired_class, img_name_list_2007, img_list_2007)
+
+
+desired_class_set = 'aeroplane_train'
+desired_class = 'aeroplane'
+
+### loading up VOC2012 images of a given class
+img_name_list_2012 = image_actions.get_img_names(VOC2012_path, desired_class_set)
+img_list_2012 = image_actions.load_images(VOC2012_path, img_name_list_2012) 
+img_list_2012, groundtruths_2012, img_name_list_2012 = get_correct_class_test.get_class_images(VOC2012_path, desired_class, img_name_list_2012, img_list_2012)
+
+### combine 2007 and 2012 datasets
+img_list = img_list_2007+img_list_2012
+groundtruths = groundtruths_2007+groundtruths_2012
+img_name_list = img_name_list_2007+img_name_list_2012
+
+
+# DEBUG: Overfitting hack
+#img_list = [img_list[0]] *100
+#groundtruths = [groundtruths[0]] *100
 
 number_of_actions = 5
 history_length = 8
@@ -50,13 +70,13 @@ vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 
 # initialise Q network (randomly or with existing weights)
-#loaded_weights_name = 'aeroplane_120717_01.hdf5'
+#loaded_weights_name = 'aeroplane_170717_02_test.hdf5'
 #loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
 loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'aeroplane_170717_02_test.hdf5'
+saved_weights = 'combi_aeroplane_180717_02_appr_forcedIOU06_augoff.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
@@ -78,10 +98,10 @@ training_iterations = int(number_of_experiences_to_train_from/batch_size)
 training_epochs = 100
 
 # number of actions taken per image
-T = 30
+T = 40
 
 # image data splits - lowers memory consumption per episode by only processing a subset at a time
-chunk_factor = 1
+chunk_factor = 5
 chunk_size = int(len(img_list)/chunk_factor)
 
 # loop through images
@@ -114,11 +134,11 @@ for episode in range(episodes):
 			# collect bounding boxes for each image
 			ground_image_bb_gt = groundtruths[image_ix]#image_actions.get_bb_gt(image_name)
 
-			# data augmentation -> 0.5 probability of flipping image horizontally
-			augment = bool(random.getrandbits(1))
-			if augment:
-				original_image, ground_image_bb_gt = image_augmentation.flip_image(original_image, ground_image_bb_gt)
-				image = np.fliplr(image)
+			## data augmentation -> 0.5 probability of flipping image and bounding box horizontally
+			# augment = bool(random.getrandbits(1))
+			# if augment:
+			# 	original_image, ground_image_bb_gt = image_augmentation.flip_image(original_image, ground_image_bb_gt)
+			# 	image = np.fliplr(image)
 
 			# initial bounding box (whole image, raw size)
 			boundingbox = np.array([[0,0],image_dimensions])
@@ -155,7 +175,25 @@ for episode in range(episodes):
 
 				# exploration or exploitation
 				if random.uniform(0,1) < epsilon:
-					action = random.randint(0, number_of_actions-1)
+		   
+					# adding apprenticeship learning step - only positive actions are chosen
+					good_actions = []
+
+					for act in range(number_of_actions-1):
+						potential_image, potential_boundingbox = action_functions.crop_image(original_image, boundingbox, act)            
+						potential_image_IOU = []
+						for ground_truth in ground_image_bb_gt:
+							potential_iou = reinforcement_helper.IOU(ground_truth, potential_boundingbox)
+							potential_image_IOU.append(potential_iou)
+						if max(potential_image_IOU) >= max(image_IOU):
+							good_actions.append(act)
+					if len(good_actions) > 0:
+						good_actions.append(number_of_actions-1)
+						action = random.choice(good_actions)
+					else:
+						action = random.randint(0, number_of_actions-1)
+
+					
 				# if the IOU is greater than 0.5 force the action to be the terminal action
 				# this is done to help speed up the training process
 				elif max(image_IOU) > 0.6:
@@ -256,8 +294,8 @@ Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Fin
 log_location = project_root + 'project_code/network_weights/logs/'
 
 with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
-    	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
 	details.writerow(['loaded_weights','episodes', 'epsilon','gamma', 'Time_steps', 'movement_reward', 'terminal_reward', 'iou_threshold', 'update_step', 'experiences_trained_over'])	
 	details.writerow([loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,reinforcement_helper.terminal_reward,reinforcement_helper.iou_threshold, action_functions.update_step, number_of_experiences_to_train_from])
-    
+	
 

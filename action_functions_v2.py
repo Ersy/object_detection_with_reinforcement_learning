@@ -83,7 +83,7 @@ def crop_image(im, bb_in, region):
 	region: 'TL', 'TR', 'BL', 'BR', 'centre'
 
 	"""
-	
+
 	if action_dict[region] == 'right':
 		new_bb = TL_right(bb_in)
 	elif action_dict[region] == 'down':

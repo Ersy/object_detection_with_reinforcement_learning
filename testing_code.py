@@ -37,13 +37,16 @@ image = args['image']
 ### loading up VOC images of a given class
 class_file = 'aeroplane_trainval'
 img_name_list = image_actions.get_img_names(VOC_path, class_file)
-#img_name_list = [img_name_list[2]] *2
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
 desired_class = 'aeroplane'
 
 img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
+
+# DEBUG: Overfitting hack
+#img_list = [img_list[0]] *2
+#groundtruths = [groundtruths[0]] *2
 
 number_of_actions = 5
 history_length = 8
@@ -53,12 +56,12 @@ Q_net_input_size = (25128, )
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 # path for non validated set
-weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
+#weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
 
-#weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
+weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'aeroplane_170717_01.hdf5'
+saved_weights = 'aeroplane_180717_01_appr_forcedIOU06_augoff.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -73,6 +76,8 @@ all_proposals = []
 all_ground_truth = []
 
 all_IOU = []
+
+all_actions = []
 
 # IOU for terminal actions - for use in calulating evaluation stats
 terminal_IOU = []
@@ -106,6 +111,11 @@ for image_ix in range(len(img_list)):
     # list to store IOU for each object in the image and current bounding box
     IOU_list = []
 
+    # list to store actions taken for each image to associate with IOUs
+    # the first IOU is associated with no action
+    action_list = []
+    action_list.append(-1)
+
     image_IOU = []
     # get the IOU for each object
     for ground_truth in ground_image_bb_gt:
@@ -122,7 +132,7 @@ for image_ix in range(len(img_list)):
     # get the state vector (conv output of VGG16 concatenated with the action history)
     state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
-    T = 30
+    T = 50
     for t in range(T):
 
         # add the current state to the experience list
@@ -164,6 +174,8 @@ for image_ix in range(len(img_list)):
             image_IOU.append(current_iou)
         IOU_list.append(image_IOU)
 
+        action_list.append(action)
+
         # update history vector
         history_vec[:, :-1] = history_vec[:,1:]
         history_vec[:,-1] = [0,0,0,0,0] # hard coded actions here
@@ -174,6 +186,7 @@ for image_ix in range(len(img_list)):
 
     # add the IOU calculated for each proposal for each image for evaluation purposes
     all_IOU.append(IOU_list)
+    all_actions.append(action_list)
 
 # lets the proposals and ground truth bounding boxes be visualised
 ix = 0
@@ -182,7 +195,7 @@ image_actions.view_results(img_list, all_ground_truth, all_proposals, ix)
 
 
 # simple evaluation metric
-detected = sum([i>0.5 for i in terminal_IOU])
+detected = sum([i>=0.5 for i in terminal_IOU])
 termination_total = float(len(terminal_IOU))
 termination_accuracy = detected/termination_total
 print("termination accuracy = ", termination_accuracy)
@@ -200,15 +213,35 @@ print('final proposal accuracy = ', final_proposal_accuracy)
 
 
 # code for investigating actions taken for different images - assessing the agent performance
-IOU_above_cutoff = [i for i in all_IOU if any(j[0]>0.5 for j in i)]
-
+IOU_above_cutoff = [i for i in all_IOU if any(j[0]>=0.5 for j in i)]
+IOU_below_cutoff = [i for i in all_IOU if any(j[0]<0.5 for j in i)]
 for img in IOU_above_cutoff:
     plt.plot(img)
     plt.xlabel('action number')
     plt.ylabel('IOU')
+
 plt.show()
 
+TP = sum([i>=0.5 for i in terminal_IOU])
+FP = sum([i<0.5 for i in terminal_IOU])
+FN = total_objects-(TP+FP)
 
+AP = float(TP)/(TP+FP)
+Recall = float(TP)/(TP+FN)
+
+print('precision = ', AP)
+print('recall = ', Recall)
+
+average_terminal_IOU = sum(terminal_IOU)/len(terminal_IOU)
+print("average terminal IOU = ", average_terminal_IOU)
+
+# calculating mAP
+# true positive -> IOU over 0.5 + terminal action
+# false positive -> IOU under 0.5 + terminal action
+# false negative -> no terminal action taken
+
+# precision = TP/(TP+FP)
+# recall = TP/(TP+FN)
 
 # Log of training parameters
 log_location = project_root + 'project_code/network_weights/logs/'

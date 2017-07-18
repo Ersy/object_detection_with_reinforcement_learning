@@ -31,9 +31,6 @@ class_name_dict = { 	'aeroplane':1,
 			}
 
 
-VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
-VOC_path = "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
-
 def load_images(VOC_path, image_names):
 	"""
 	loads images from a given data set
@@ -70,7 +67,7 @@ def get_img_labels(VOC_path, data_set_name):
 	return [x.split(None, 1)[1] for x in image_names]
 	
 
-def get_bb_gt(image_name):
+def get_bb_gt(VOC_path, image_name):
 	"""
 	get the ground truth bounding box values and class for an image
 	"""

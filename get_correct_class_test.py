@@ -15,7 +15,7 @@ def get_class_images(VOC_path, desired_class, img_name_list, img_list):
 	# collect bounding boxes for each image
 	for image_ix in range(len(img_name_list)):
 		current_image_groundtruth = []
-		ground_image_bb_gt = image_actions.get_bb_gt(img_name_list[image_ix])
+		ground_image_bb_gt = image_actions.get_bb_gt(VOC_path, img_name_list[image_ix])
 		image_flag = False	
 		for ix in range(len(ground_image_bb_gt[0])):	
 			if ground_image_bb_gt[0][ix] == desired_class:
