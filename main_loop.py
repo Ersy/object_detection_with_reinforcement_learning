@@ -70,13 +70,13 @@ vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 
 # initialise Q network (randomly or with existing weights)
-#loaded_weights_name = 'aeroplane_170717_02_test.hdf5'
-#loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
-loaded_weights = '0'
+loaded_weights_name = 'combi_aeroplane_180717_02_appr_forcedIOU06_augoff.hdf5'
+loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
+#loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'combi_aeroplane_180717_02_appr_forcedIOU06_augoff.hdf5'
+saved_weights = 'combi_aeroplane_190717_01_appr_forcedIOU06_augoff.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
@@ -101,7 +101,7 @@ training_epochs = 100
 T = 40
 
 # image data splits - lowers memory consumption per episode by only processing a subset at a time
-chunk_factor = 5
+chunk_factor = 8
 chunk_size = int(len(img_list)/chunk_factor)
 
 # loop through images
