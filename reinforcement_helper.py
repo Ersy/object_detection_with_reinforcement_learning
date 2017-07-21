@@ -55,13 +55,13 @@ def get_state_as_vec(image, history_vector, model_vgg):
 
 def get_q_network(shape_of_input, number_of_actions, weights_path='0'):
 	model = Sequential()
-	model.add(Dense(1024, init='lecun_uniform', input_shape = shape_of_input))# shape, name: normal(shape, scale=0.01, name=name)))
+	model.add(Dense(1024, init='lecun_uniform', input_shape = shape_of_input))
 	model.add(Activation('relu'))
 	model.add(Dropout(0.2))
-	model.add(Dense(1024, init='lecun_uniform'))# shape, name: normal(shape, scale=0.01, name=name)))
+	model.add(Dense(1024, init='lecun_uniform'))
 	model.add(Activation('relu'))
 	model.add(Dropout(0.2))
-	model.add(Dense(number_of_actions, init='lecun_uniform'))#lambda shape, name: normal(shape, scale=0.01, name=name)))
+	model.add(Dense(number_of_actions, init='lecun_uniform'))
 	model.add(Activation('linear'))
 	adam = Adam(lr=1e-6)
 	model.compile(loss='mse', optimizer=adam)

@@ -7,6 +7,7 @@ import matplotlib.patches as patches
 import random
 import os
 import csv
+import collections
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
@@ -61,7 +62,7 @@ weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final P
 #weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'combi_aeroplane_180717_03_appr_forcedIOU06_augoff.hdf5'
+saved_weights = 'modelx_5000expCombined.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -114,8 +115,7 @@ for image_ix in range(len(img_list)):
 	# list to store actions taken for each image to associate with IOUs
 	# the first IOU is associated with no action
 	action_list = []
-	action_list.append(-1)
-
+	
 	image_IOU = []
 	# get the IOU for each object
 	for ground_truth in ground_image_bb_gt:
@@ -165,6 +165,13 @@ for image_ix in range(len(img_list)):
 
 			terminal_IOU.append(max(current_image_IOU))
 			terminal_index.append(image_ix)
+			action_list.append(action)
+			all_actions.append(action_list)
+
+			# implement something to mask the region covered by the boundingbox
+			# rerun for the image 
+			# image[boundingbox[0,0]:boundingbox[1,0], boundingbox[0,1]:boundingbox[1,1]] = mask
+
 			break
 
 		# measure IOU
@@ -215,17 +222,41 @@ final_proposal_accuracy = final_proposal_detected/total_objects
 print('final proposal accuracy = ', final_proposal_accuracy)
 
 
+fig, ax = plt.subplots(3, 1)
 # code for investigating actions taken for different images - assessing the agent performance
 IOU_above_cutoff = [i for i in all_IOU if any(j[0]>=0.5 for j in i)]
-IOU_below_cutoff = [i for i in all_IOU if any(j[0]<0.5 for j in i)]
+IOU_below_cutoff = [i for i in all_IOU if all(j[0]<0.5 for j in i)]
 for img in IOU_above_cutoff:
-	plt.plot(img)
-	plt.xlabel('action number')
-	plt.ylabel('IOU')
+	ax[0].plot(img)
+	ax[0].set_xlabel('action number')
+	ax[0].set_ylabel('IOU')
+ax[0].set_title('IOU above cutoff')
+
+#for img in IOU_below_cutoff:
+#	ax[1].plot(img)
+#	ax[1].set_xlabel('action number')
+#	ax[1].set_ylabel('IOU')
+#ax[1].set_title('IOU below cutoff')
+
+
+# storing the number of actions taken before the terminal action
+action_count = [len(i) for i in all_actions if i[-1] == 4]
+action_count_mean = sum(action_count)/len(action_count)
+counter = collections.Counter(action_count)
+
+
+ax[2].bar(counter.keys(), counter.values())
+ax[2].set_xlabel("Number of actions taken")
+ax[2].set_ylabel("Count")
+ax[2].axvline(action_count_mean, color='red', linewidth=2)
+align = 'left'
+ax[2].annotate('Mean: {:0.2f}'.format(action_count_mean), xy=(action_count_mean, 1), xytext=(15, 15),
+        xycoords=('data', 'axes fraction'), textcoords='offset points',
+        horizontalalignment=align, verticalalignment='center',
+        arrowprops=dict(arrowstyle='-|>', fc='black', shrinkA=0, shrinkB=0,
+                        connectionstyle='angle,angleA=0,angleB=90,rad=10'))
 
 plt.show()
-
-
 
 # calculating mAP
 # true positive -> IOU over 0.5 + terminal action
@@ -246,9 +277,9 @@ print('F1 = ', F1)
 
 average_terminal_IOU = sum(terminal_IOU)/len(terminal_IOU)
 print("average terminal IOU = ", average_terminal_IOU)
-average_TP_IOU = sum([i for i in terminal_IOU if i>=0.5])/TP
+average_TP_IOU = sum([i for i in terminal_IOU if i>=0.5])/TP if TP >0 else 0
 print("average TP IOU = ", average_TP_IOU)
-average_FP_IOU = sum([i for i in terminal_IOU if i<0.5])/FP
+average_FP_IOU = sum([i for i in terminal_IOU if i<0.5])/FP if FP>0 else 0
 print("average FP IOU = ", average_FP_IOU)
 
 ###
@@ -259,8 +290,12 @@ false_pos_list = [i[0] for i in terminal_IOU_index if i[1] < 0.5]
 
 
 # Log of parameters and testing scores
-log_names = ['class_file', 'Time_steps', 'termination_accuracy', 'total_accuracy', 'precision', 'recall', 'F1', 'average_terminal_IOU']
-log_vars = [class_file, T, termination_accuracy, total_accuracy, AP, Recall, F1, average_terminal_IOU]
+log_names = ['class_file', 'Time_steps', 'termination_accuracy', 
+			'total_accuracy', 'precision', 'recall', 'F1', 'average_terminal_IOU',
+			'average_TP_IOU', 'average_FP_IOU']
+
+log_vars = [class_file, T, termination_accuracy, total_accuracy, AP, Recall, F1, 
+			average_terminal_IOU, average_TP_IOU, average_FP_IOU]
 
 log_location = project_root + 'project_code/network_weights/logs/'
 with open(log_location+saved_weights + '.csv', 'a') as csvfile:

@@ -70,13 +70,13 @@ vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 
 # initialise Q network (randomly or with existing weights)
-loaded_weights_name = 'combi_aeroplane_180717_02_appr_forcedIOU06_augoff.hdf5'
-loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
-#loaded_weights = '0'
+#loaded_weights_name = 'combi_aeroplane_180717_02_appr_forcedIOU06_augoff.hdf5'
+#loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
+loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'combi_aeroplane_190717_01_appr_forcedIOU06_augoff.hdf5'
+saved_weights = 'modelx_5000expCombined.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
@@ -92,7 +92,7 @@ gamma = 0.9
 
 # set the number of experiences to train from for each episode and batch size
 number_of_experiences_to_train_from = 5000
-batch_size = 5000
+batch_size = 2500
 training_iterations = int(number_of_experiences_to_train_from/batch_size)
 
 training_epochs = 100
@@ -100,13 +100,29 @@ training_epochs = 100
 # number of actions taken per image
 T = 40
 
+# IOU at which the terminal action is triggered (guided learning approach)
+force_terminal = 0.6
+
 # image data splits - lowers memory consumption per episode by only processing a subset at a time
+# when selecting the chunk factor take into account the dataset size and number of actions taken
+# with the full dataset and 40 actions, a chunk factor of 8 or so should be used
 chunk_factor = 8
 chunk_size = int(len(img_list)/chunk_factor)
+
+# some metrics to collect in training
+# collect the counts of actions in each episode of training
+action_counts = []
+avg_reward = []
 
 # loop through images
 for episode in range(episodes):
 	print("this is episode:", episode)
+
+	# collect count of actions in the episode
+	action_count = [0,0,0,0,0]
+
+	# collect the summation of rewards for an episode
+	reward_summation = 0
 
 	for chunk in range(chunk_factor):
 
@@ -196,7 +212,7 @@ for episode in range(episodes):
 					
 				# if the IOU is greater than 0.5 force the action to be the terminal action
 				# this is done to help speed up the training process
-				elif max(image_IOU) > 0.6:
+				elif max(image_IOU) > force_terminal:
 					action = number_of_actions-1
 				else:
 					# plug state into Q network
@@ -234,6 +250,10 @@ for episode in range(episodes):
 				experiences[image_ix-chunk_offset][t].append(action)
 				experiences[image_ix-chunk_offset][t].append(reward)
 				experiences[image_ix-chunk_offset][t].append(state_vec)
+
+				# increment the action used
+				action_count[action] += 1
+				reward_summation += reward
 
 		# pickle_path = "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/episodes/"
 
@@ -287,15 +307,27 @@ for episode in range(episodes):
 
 			Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, callbacks=callbacks_list, validation_split=0.2, verbose=0)
 
+	# collect the counts of actions taken per episode
+	action_counts.append(action_count)
+	avg_reward.append(float(reward_summation)/len(img_list))
+
 Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'+saved_weights)
 
 
 # Log of training parameters
 log_location = project_root + 'project_code/network_weights/logs/'
 
+log_names = ['loaded_weights','episodes', 'epsilon','gamma', 
+				'Time_steps', 'movement_reward', 'terminal_reward', 
+				'iou_threshold', 'update_step', 'experiences_trained_over', 'force_terminal']
+
+log_vars = [loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,
+			reinforcement_helper.terminal_reward,reinforcement_helper.iou_threshold, 
+			action_functions.update_step, number_of_experiences_to_train_from, force_terminal]
+
 with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
 	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-	details.writerow(['loaded_weights','episodes', 'epsilon','gamma', 'Time_steps', 'movement_reward', 'terminal_reward', 'iou_threshold', 'update_step', 'experiences_trained_over'])	
-	details.writerow([loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,reinforcement_helper.terminal_reward,reinforcement_helper.iou_threshold, action_functions.update_step, number_of_experiences_to_train_from])
+	details.writerow(log_names)	
+	details.writerow(log_vars)
 	
 
