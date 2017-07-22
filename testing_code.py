@@ -62,7 +62,7 @@ weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final P
 #weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'modelx_5000expCombined.hdf5'
+saved_weights = 'model4.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -222,10 +222,15 @@ final_proposal_accuracy = final_proposal_detected/total_objects
 print('final proposal accuracy = ', final_proposal_accuracy)
 
 
+# turn list of IOUs for each image into separate object IOUs
+t1 = [[list(j) for j in zip(*i)] for i in all_IOU]
+t2 = [i for j in t1 for i in j]
+
+
 fig, ax = plt.subplots(3, 1)
 # code for investigating actions taken for different images - assessing the agent performance
-IOU_above_cutoff = [i for i in all_IOU if any(j[0]>=0.5 for j in i)]
-IOU_below_cutoff = [i for i in all_IOU if all(j[0]<0.5 for j in i)]
+IOU_above_cutoff = [i for i in t2 if any(j[0]>=0.5 and j[-1] >= 0.5 for j in i)]
+IOU_below_cutoff = [i for i in t2 if all(j[0]<0.5 for j in i)]
 for img in IOU_above_cutoff:
 	ax[0].plot(img)
 	ax[0].set_xlabel('action number')
@@ -287,6 +292,15 @@ print("average FP IOU = ", average_FP_IOU)
 # Get examples of images that had a terminal IOU below 0.5
 terminal_IOU_index = zip(terminal_index, terminal_IOU)
 false_pos_list = [i[0] for i in terminal_IOU_index if i[1] < 0.5]
+
+
+# Assessing the quality of the agent
+# look at cumulative reward as a function of steps 
+# calculate the reward in testing with different models
+# calculate expected return
+
+IOU_difference = [[k-j for j,k in zip(i[:-1], i[1:])] for i in t2]
+
 
 
 # Log of parameters and testing scores

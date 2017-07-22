@@ -16,7 +16,7 @@ past_action_val = 8
 
 movement_reward = 1
 terminal_reward = 3
-iou_threshold = 0.6
+iou_threshold = 0.5
 
 
 def get_reward(action, IOU_list, t):

@@ -76,13 +76,13 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'modelx_5000expCombined.hdf5'
+saved_weights = 'model4.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
 ### Q network definition
-episodes = 50
+episodes = 20
 
 # random action probability
 epsilon = 1
@@ -101,7 +101,7 @@ training_epochs = 100
 T = 40
 
 # IOU at which the terminal action is triggered (guided learning approach)
-force_terminal = 0.6
+force_terminal = 0.5
 
 # image data splits - lowers memory consumption per episode by only processing a subset at a time
 # when selecting the chunk factor take into account the dataset size and number of actions taken
