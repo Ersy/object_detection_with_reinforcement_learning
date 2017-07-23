@@ -8,30 +8,27 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
 ### Reference values
-class_name_dict = { 'aeroplane':1,
-					'bicycle': 2,
-					'bird': 3,
-					'boat':4, 
-					'bottle': 5,
-					'bus':6,
-					'car':7,
-					'cat': 8,
-					'chair': 9,
-					'cow':10,
-					'diningtable':11,
-					'dog':12,
-					'horse':13,
-					'motorbike': 14,
-					'person':15,
-					'pottedplant':16,
-					'sheep':17,
-					'sofa':18,
-					'train':19,
-					'tvmonitor':20
-					}
-
-
-VOC_path = "/media/ersy/DATA/Google Drive/QM Work/Queen Mary/Course/Final Project/Reinforcement learning/VOCdevkit/VOC2007"
+class_name_dict = { 	'aeroplane':1,
+			'bicycle': 2,
+			'bird': 3,
+			'boat':4, 
+			'bottle': 5,
+			'bus':6,
+			'car':7,
+			'cat': 8,
+			'chair': 9,
+			'cow':10,
+			'diningtable':11,
+			'dog':12,
+			'horse':13,
+			'motorbike': 14,
+			'person':15,
+			'pottedplant':16,
+			'sheep':17,
+			'sofa':18,
+			'train':19,
+			'tvmonitor':20
+			}
 
 
 def load_images(VOC_path, image_names):
@@ -70,7 +67,7 @@ def get_img_labels(VOC_path, data_set_name):
 	return [x.split(None, 1)[1] for x in image_names]
 	
 
-def get_bb_gt(image_name):
+def get_bb_gt(VOC_path, image_name):
 	"""
 	get the ground truth bounding box values and class for an image
 	"""
@@ -142,18 +139,21 @@ def view_results(im, groundtruth, proposals, ix):
 	fig, ax = plt.subplots(1)
 	ax.imshow(im)
 
-	for proposal in proposals:
+	num_of_proposals = len(proposals)
+	color = plt.cm.rainbow(np.linspace(0,1,num_of_proposals))
+
+	for proposal, c in zip(proposals, color):
 	    top_left = (proposal[0,1], proposal[0,0])
 	    width = proposal[1,1] - proposal[0,1]
 	    height = proposal[1,0] - proposal[0,0]
-	    rect = patches.Rectangle(top_left, width, height, linewidth=3, edgecolor='b', facecolor='none')
+	    rect = patches.Rectangle(top_left, width, height, linewidth=2, edgecolor=c, facecolor='none')
 	    ax.add_patch(rect)
 
 	for ground_truth_box in groundtruth[ix]:
 	    top_left = (ground_truth_box[0,1], ground_truth_box[0,0])
 	    width = ground_truth_box[1,1] - ground_truth_box[0,1]
 	    height = ground_truth_box[1,0] - ground_truth_box[0,0]
-	    rect = patches.Rectangle(top_left, width, height, linewidth=3, edgecolor='r', facecolor='none')
+	    rect = patches.Rectangle(top_left, width, height, linewidth=2, edgecolor='white', facecolor='none')
 	    ax.add_patch(rect)
 
 	plt.show()

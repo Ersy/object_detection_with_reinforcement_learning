@@ -4,7 +4,7 @@ import numpy as np
 action_dict = {0:'right',1:'down',2:'left',3:'up'}
 
 # amount to update the corner positions by for each step
-update_step = 0.05
+update_step = 0.1
 
 def TL_right(bb):
 	"""moves the top corner to the right"""
@@ -83,7 +83,7 @@ def crop_image(im, bb_in, region):
 	region: 'TL', 'TR', 'BL', 'BR', 'centre'
 
 	"""
-	
+
 	if action_dict[region] == 'right':
 		new_bb = TL_right(bb_in)
 	elif action_dict[region] == 'down':
