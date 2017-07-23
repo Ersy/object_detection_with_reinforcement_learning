@@ -57,12 +57,12 @@ Q_net_input_size = (25128, )
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 # path for non validated set
-weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
+#weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
 
-#weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
+weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'model4.hdf5'
+saved_weights = 'modelbesttest_stagedreward_50.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -229,8 +229,8 @@ t2 = [i for j in t1 for i in j]
 
 fig, ax = plt.subplots(3, 1)
 # code for investigating actions taken for different images - assessing the agent performance
-IOU_above_cutoff = [i for i in t2 if any(j[0]>=0.5 and j[-1] >= 0.5 for j in i)]
-IOU_below_cutoff = [i for i in t2 if all(j[0]<0.5 for j in i)]
+IOU_above_cutoff  = [i for i in t2 if i[-1]>=0.5]
+IOU_below_cutoff = [i for i in t2 if all(i)<0.5]
 for img in IOU_above_cutoff:
 	ax[0].plot(img)
 	ax[0].set_xlabel('action number')

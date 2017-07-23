@@ -15,8 +15,16 @@ number_of_actions = 5
 past_action_val = 8
 
 movement_reward = 1
-terminal_reward = 3
-iou_threshold = 0.5
+
+
+terminal_reward_5 = 3
+terminal_reward_7 = 5
+terminal_reward_9 = 7
+
+iou_threshold_5 = 0.5
+iou_threshold_7 = 0.7
+iou_threshold_9 = 0.9
+
 
 
 def get_reward(action, IOU_list, t):
@@ -24,10 +32,14 @@ def get_reward(action, IOU_list, t):
 	generates the correct reward based on the result of the chosen action
 	"""
 	if action == number_of_actions-1:
-		if max(IOU_list[t+1]) > iou_threshold:
-			return terminal_reward
+		if max(IOU_list[t+1]) > iou_threshold_9:
+			return terminal_reward_9
+		elif max(IOU_list[t+1]) > iou_threshold_7:
+			return terminal_reward_7
+		elif max(IOU_list[t+1]) > iou_threshold_5:
+			return terminal_reward_5
 		else:
-			return -terminal_reward
+			return -terminal_reward_5
 
 	else:
 		current_IOUs = IOU_list[t+1]

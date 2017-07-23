@@ -1,7 +1,7 @@
 import numpy as np
 import argparse
 import csv
-
+import time
 import random
 
 from keras.applications import imagenet_utils
@@ -76,13 +76,13 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'model4.hdf5'
+saved_weights = 'modelbesttest_stagedreward_50.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
 ### Q network definition
-episodes = 20
+episodes = 50
 
 # random action probability
 epsilon = 1
@@ -93,7 +93,6 @@ gamma = 0.9
 # set the number of experiences to train from for each episode and batch size
 number_of_experiences_to_train_from = 5000
 batch_size = 2500
-training_iterations = int(number_of_experiences_to_train_from/batch_size)
 
 training_epochs = 100
 
@@ -101,12 +100,12 @@ training_epochs = 100
 T = 40
 
 # IOU at which the terminal action is triggered (guided learning approach)
-force_terminal = 0.5
+force_terminal = 0.6
 
 # image data splits - lowers memory consumption per episode by only processing a subset at a time
 # when selecting the chunk factor take into account the dataset size and number of actions taken
 # with the full dataset and 40 actions, a chunk factor of 8 or so should be used
-chunk_factor = 8
+chunk_factor = 4
 chunk_size = int(len(img_list)/chunk_factor)
 
 # some metrics to collect in training
@@ -261,51 +260,56 @@ for episode in range(episodes):
 		# 	cPickle.dump(episodes, pickle_file, protocol=cPickle.HIGHEST_PROTOCOL)
 
 		# Actual training per given episode over a set number of experiences (training iterations)
-		for train_iteration in range(training_iterations):
-			# flatten the experiences list for learning
-			flat_experiences = [x for l in experiences for x in l]
 
-			# collect random batch of experiences
-			random_ix = list(np.random.randint(0, len(flat_experiences), batch_size))
-			random_experiences = np.array(flat_experiences)[random_ix]
-			
-			# calculating the Q values for the initial state
-			initial_state = np.array([state[0] for state in random_experiences]).squeeze(1)
-			initial_Q = Q_net.predict(initial_state, batch_size)
+		# flatten the experiences list for learning
+		flat_experiences = [x for l in experiences for x in l]
 
-			# calculating the Q values for the next state
-			next_state = np.array([state[3] for state in random_experiences]).squeeze(1)
-			next_Q = Q_net.predict(next_state, batch_size)
-			
-			# calculating the maximum Q for the next state
-			next_Q_max = next_Q.max(axis=1)
+		# collect random batch of experiences
+		# random_ix = list(np.random.randint(0, len(flat_experiences), number_of_experiences_to_train_from))
+		# random_experiences = np.array(flat_experiences)[random_ix]
+		
+		random_experiences = np.array(flat_experiences)
 
-			# get the reward for a given experience
-			# random_reward = np.expand_dims(random_experiences[:, 2], 1)
-			random_reward = random_experiences[:, 2]
+		# calculating the Q values for the initial state
+		initial_state = np.array([state[0] for state in random_experiences]).squeeze(1)
+		initial_Q = Q_net.predict(initial_state, number_of_experiences_to_train_from)
 
-			# get the action of a given experience
-			random_actions = np.expand_dims(random_experiences[:, 1], 1)
-			flat_actions = [x for l in random_actions for x in l]
+		# calculating the Q values for the next state
+		next_state = np.array([state[3] for state in random_experiences]).squeeze(1)
+		next_Q = Q_net.predict(next_state, number_of_experiences_to_train_from)
+		
+		# calculating the maximum Q for the next state
+		next_Q_max = next_Q.max(axis=1)
 
-			# collect the indexes of terminal actions and set next state Q value to 0
-			# if the terminal action is selected the episode ends and there should be no additional reward
-			terminal_indices = [i for i, x in enumerate(flat_actions) if x == number_of_actions-1]
-			next_Q_max[terminal_indices] = 0
+		# get the reward for a given experience
+		# random_reward = np.expand_dims(random_experiences[:, 2], 1)
+		random_reward = random_experiences[:, 2]
 
-			# discount the future reward, i.e the Q value output
-			target = np.array(next_Q_max) * gamma
+		# get the action of a given experience
+		random_actions = np.expand_dims(random_experiences[:, 1], 1)
+		flat_actions = [x for l in random_actions for x in l]
 
-			# target for the current state should be the Q value of the next state - the reward 
-			target = target + random_reward
+		# collect the indexes of terminal actions and set next state Q value to 0
+		# if the terminal action is selected the episode ends and there should be no additional reward
+		terminal_indices = [i for i, x in enumerate(flat_actions) if x == number_of_actions-1]
+		next_Q_max[terminal_indices] = 0
 
-			# repeat the target array to the same size as the initial_Q array (allowing the cost to be limited to the selected actions)
-			target_repeated = np.matlib.repmat(target, 5, 1).T
+		# discount the future reward, i.e the Q value output
+		target = np.array(next_Q_max) * gamma
 
-			# this takes the initial Q values for the state and replaces only the Q values for the actions that were used to the new target, else the error should be 0
-			initial_Q[np.arange(len(initial_Q)), flat_actions] = target_repeated[np.arange(len(target_repeated)), flat_actions]
+		# target for the current state should be the Q value of the next state - the reward 
+		target = target + random_reward
 
-			Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, callbacks=callbacks_list, validation_split=0.2, verbose=0)
+		# repeat the target array to the same size as the initial_Q array (allowing the cost to be limited to the selected actions)
+		target_repeated = np.matlib.repmat(target, 5, 1).T
+
+		# this takes the initial Q values for the state and replaces only the Q values for the actions that were used to the new target, else the error should be 0
+		initial_Q[np.arange(len(initial_Q)), flat_actions] = target_repeated[np.arange(len(target_repeated)), flat_actions]
+
+		before = time.time()
+		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, shuffle=True, verbose=0, callbacks=callbacks_list, validation_split=0.2)
+		after = time.time()
+		print("Time taken =", after-before)
 
 	# collect the counts of actions taken per episode
 	action_counts.append(action_count)
@@ -318,11 +322,12 @@ Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Fin
 log_location = project_root + 'project_code/network_weights/logs/'
 
 log_names = ['loaded_weights','episodes', 'epsilon','gamma', 
-				'Time_steps', 'movement_reward', 'terminal_reward', 
-				'iou_threshold', 'update_step', 'experiences_trained_over', 'force_terminal']
+				'Time_steps', 'movement_reward', 'terminal_reward_5', 'terminal_reward_7', 'terminal_reward_9',
+				'iou_threshold_5', 'iou_threshold_7','iou_threshold_9','update_step', 'experiences_trained_over', 'force_terminal']
 
 log_vars = [loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,
-			reinforcement_helper.terminal_reward,reinforcement_helper.iou_threshold, 
+			reinforcement_helper.terminal_reward_5,reinforcement_helper.terminal_reward_7,reinforcement_helper.terminal_reward_9,
+			reinforcement_helper.iou_threshold_5, reinforcement_helper.iou_threshold_7,reinforcement_helper.iou_threshold_9,
 			action_functions.update_step, number_of_experiences_to_train_from, force_terminal]
 
 with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
