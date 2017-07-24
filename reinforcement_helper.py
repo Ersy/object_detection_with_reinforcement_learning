@@ -4,6 +4,7 @@ from keras.optimizers import RMSprop, SGD, Adam #optimising method (cost functio
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.initializers import normal, identity
 
+
 import numpy as np
 
 # Visual descriptor size
@@ -27,28 +28,25 @@ iou_threshold_9 = 0.9
 
 
 
-def get_reward(action, IOU_list, t):
+def get_reward(action, IOU_list, t, gt_labels):
 	"""
 	generates the correct reward based on the result of the chosen action
 	"""
-	if action == number_of_actions-1:
-		if max(IOU_list[t+1]) > iou_threshold_9:
-			return terminal_reward_9
-		elif max(IOU_list[t+1]) > iou_threshold_7:
-			return terminal_reward_7
-		elif max(IOU_list[t+1]) > iou_threshold_5:
-			return terminal_reward_5
-		else:
-			return -terminal_reward_5
+	current_IOUs = IOU_list[t+1]
+	past_IOUs = IOU_list[t]
+	current_target = np.argmax(current_IOUs)
+	max_label = gt_labels[current_target]
 
-	else:
-		current_IOUs = IOU_list[t+1]
-		past_IOUs = IOU_list[t]
-		current_target = np.argmax(current_IOUs)
-		if current_IOUs[current_target] - past_IOUs[current_target] > 0:
-			return movement_reward
+	if action == number_of_actions-1:
+		if max(current_IOUs) > iou_threshold_5:
+			return terminal_reward_5, max_label
 		else:
-			return -movement_reward
+			return -terminal_reward_5, max_label
+	else:
+		if current_IOUs[current_target] - past_IOUs[current_target] > 0:
+			return movement_reward, max_label
+		else:
+			return -movement_reward, max_label
 		
 
 
@@ -64,6 +62,11 @@ def get_state_as_vec(image, history_vector, model_vgg):
 	state = np.vstack((descriptor_image, history_vector)).T
 	return state
 
+def get_state(im, hist):
+	action_hist = np.reshape(hist, (number_of_actions*past_action_val, 1))
+	a = action_hist.squeeze()
+	b = np.expand_dims(a, axis=0)
+	return [im, b]
 
 def get_q_network(shape_of_input, number_of_actions, weights_path='0'):
 	model = Sequential()
