@@ -15,7 +15,7 @@ import numpy as np
 number_of_actions = 5
 past_action_val = 8
 
-def get_full_network():
+def get_full_network(weights_path=False):
 
 	# base VGG16 model
 	vgg16 = VGG16(include_top=True, weights='imagenet')
@@ -53,6 +53,11 @@ def get_full_network():
 	full_model.compile(optimizer=adam,
 	              loss={'main_output': 'mse', 'class_output': 'categorical_crossentropy'},
 	              loss_weights={'main_output': 1., 'class_output': 0.2})
+	
+	# load in saved weights
+	if weights_path:
+		full_model.load_weights(weights_path)
+	
 	return full_model
 
 full_model = get_full_network()

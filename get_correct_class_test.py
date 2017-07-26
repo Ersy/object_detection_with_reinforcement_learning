@@ -1,5 +1,6 @@
 import image_actions
 
+"""
 def get_class_images(VOC_path, desired_class, img_name_list, img_list):
 	desired_class = image_actions.class_name_dict[desired_class]
 
@@ -27,8 +28,9 @@ def get_class_images(VOC_path, desired_class, img_name_list, img_list):
 			desired_class_list_name.append(img_name_list[image_ix])
 
 	return desired_class_list_image, desired_class_list_bb, desired_class_list_name
+"""
 
-def get_class_images(VOC_path, desired_class, img_name_list, img_list):
+def get_class_images(VOC_path, desired_class, img_name_list):
 	desired_class = image_actions.class_name_dict[desired_class]
 
 	### loading up VOC images of a given class
@@ -38,7 +40,6 @@ def get_class_images(VOC_path, desired_class, img_name_list, img_list):
 
 	desired_class_list_bb = []
 	desired_class_list_bb_label = []
-	desired_class_list_image = []
 	desired_class_list_name = []
 
 	# collect bounding boxes for each image
@@ -51,8 +52,7 @@ def get_class_images(VOC_path, desired_class, img_name_list, img_list):
 			current_image_groundtruth_label.append(ground_image_bb_gt[0][ix])
 	
 		desired_class_list_bb.append(current_image_groundtruth)	
-		desired_class_list_image.append(img_list[image_ix])
 		desired_class_list_name.append(img_name_list[image_ix])
 		desired_class_list_bb_label.append(current_image_groundtruth_label)
 
-	return desired_class_list_image, desired_class_list_bb, desired_class_list_name, desired_class_list_bb_label
+	return desired_class_list_bb, desired_class_list_name, desired_class_list_bb_label

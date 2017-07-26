@@ -16,6 +16,7 @@ import reinforcement_helper
 import action_functions_v2 as action_functions
 import get_correct_class_test
 import image_augmentation
+import dunno
 
 ### 
 from keras import backend as K
@@ -38,22 +39,19 @@ desired_class = 'aeroplane'
 
 ### loading up VOC2007 images of a given class
 img_name_list_2007 = image_actions.get_img_names(VOC2007_path, desired_class_set)
+groundtruths_2007, img_name_list_2007, groundtruths_label_2007 = get_correct_class_test.get_class_images(VOC2007_path, desired_class, img_name_list_2007)
 img_list_2007 = image_actions.load_images(VOC2007_path, img_name_list_2007) 
-img_list_2007, groundtruths_2007, img_name_list_2007 = get_correct_class_test.get_class_images(VOC2007_path, desired_class, img_name_list_2007, img_list_2007)
-
-
-desired_class_set = 'aeroplane_train'
-desired_class = 'aeroplane'
 
 ### loading up VOC2012 images of a given class
-img_name_list_2012 = image_actions.get_img_names(VOC2012_path, desired_class_set)
-img_list_2012 = image_actions.load_images(VOC2012_path, img_name_list_2012) 
-img_list_2012, groundtruths_2012, img_name_list_2012 = get_correct_class_test.get_class_images(VOC2012_path, desired_class, img_name_list_2012, img_list_2012)
+# img_name_list_2012 = image_actions.get_img_names(VOC2012_path, desired_class_set)
+# groundtruths_2012, img_name_list_2012, groundtruths_label_2012 = get_correct_class_test.get_class_images(VOC2012_path, desired_class, img_name_list_2012)
+# img_list_2012 = image_actions.load_images(VOC2012_path, img_name_list_2012) 
 
 ### combine 2007 and 2012 datasets
-img_list = img_list_2007+img_list_2012
-groundtruths = groundtruths_2007+groundtruths_2012
-img_name_list = img_name_list_2007+img_name_list_2012
+img_list = img_list_2007#+img_list_2012
+groundtruths = groundtruths_2007#+groundtruths_2012
+img_name_list = img_name_list_2007#+img_name_list_2012
+groundtruths_label = groundtruths_label_2007#+groundtruths_label_2012
 
 
 # DEBUG: Overfitting hack
@@ -62,27 +60,23 @@ img_name_list = img_name_list_2007+img_name_list_2012
 
 number_of_actions = 5
 history_length = 8
-Q_net_input_size = (25128, )
 
-
-### VGG16 model without top
-vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 
 # initialise Q network (randomly or with existing weights)
-#loaded_weights_name = 'combi_aeroplane_180717_02_appr_forcedIOU06_augoff.hdf5'
-#loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
-loaded_weights = '0'
-Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
+loaded_weights_name = 'newmodeltypez.hdf5'
+loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
 
+Q_net = dunno.get_full_network(loaded_weights)
 # setting up callback to save best model
-saved_weights = 'modelbesttest_stagedreward_50.hdf5'
+
+saved_weights = 'newmodeltypez_2.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
 ### Q network definition
-episodes = 50
+episodes = 20
 
 # random action probability
 epsilon = 1
@@ -91,13 +85,13 @@ epsilon = 1
 gamma = 0.9
 
 # set the number of experiences to train from for each episode and batch size
-number_of_experiences_to_train_from = 5000
-batch_size = 2500
+number_of_experiences_to_train_from = 30
+batch_size = 10
 
-training_epochs = 100
+training_epochs = 1
 
 # number of actions taken per image
-T = 40
+T = 30
 
 # IOU at which the terminal action is triggered (guided learning approach)
 force_terminal = 0.6
@@ -105,7 +99,7 @@ force_terminal = 0.6
 # image data splits - lowers memory consumption per episode by only processing a subset at a time
 # when selecting the chunk factor take into account the dataset size and number of actions taken
 # with the full dataset and 40 actions, a chunk factor of 8 or so should be used
-chunk_factor = 4
+chunk_factor = 50
 chunk_size = int(len(img_list)/chunk_factor)
 
 # some metrics to collect in training
@@ -148,7 +142,8 @@ for episode in range(episodes):
 
 			# collect bounding boxes for each image
 			ground_image_bb_gt = groundtruths[image_ix]#image_actions.get_bb_gt(image_name)
-
+			ground_image_gt_label = groundtruths_label[image_ix]
+			
 			## data augmentation -> 0.5 probability of flipping image and bounding box horizontally
 			# augment = bool(random.getrandbits(1))
 			# if augment:
@@ -175,7 +170,7 @@ for episode in range(episodes):
 			preprocessed_image = image_actions.image_preprocessing(original_image)
 
 			# get the state vector (conv output of VGG16 concatenated with the action history)
-			state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
+			state_vec = reinforcement_helper.get_state(preprocessed_image, history_vec)
 
 			# dumb trick to separate experiences for each image
 			experiences.append([])
@@ -217,7 +212,7 @@ for episode in range(episodes):
 					# plug state into Q network
 					Q_vals = Q_net.predict(state_vec)
 					# select the action based on the highest Q value
-					action = np.argmax(Q_vals)
+					action = np.argmax(Q_vals[0])
 
 
 				# if in training the termination action is used no need to get the subcrop again
@@ -233,9 +228,7 @@ for episode in range(episodes):
 				IOU_list.append(image_IOU)
 
 				# get reward if termination action is taken
-				reward = reinforcement_helper.get_reward(action, IOU_list, t)
-
-				# get the next state
+				reward, target_label = reinforcement_helper.get_reward(action, IOU_list, t, ground_image_gt_label)
 
 				# update history vector
 				history_vec[:, :-1] = history_vec[:,1:]
@@ -243,55 +236,57 @@ for episode in range(episodes):
 				history_vec[action, -1] = 1
 
 				preprocessed_image = image_actions.image_preprocessing(image)
-				state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
+				state_vec = reinforcement_helper.get_state(preprocessed_image, history_vec)
 				
+				# turn target label into binary array encoding, hard coding number of classes
+				target_arr = np.zeros(20)
+				target_arr[target_label-1] = 1
+
 				# add action, reward, and new state to the experience vector for the given image
 				experiences[image_ix-chunk_offset][t].append(action)
 				experiences[image_ix-chunk_offset][t].append(reward)
+				experiences[image_ix-chunk_offset][t].append(target_arr)
 				experiences[image_ix-chunk_offset][t].append(state_vec)
 
 				# increment the action used
 				action_count[action] += 1
 				reward_summation += reward
 
-		# pickle_path = "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/episodes/"
-
-		# with open(pickle_path+saved_weights+str(chunk)+'.pickle') as pickle_file:
-		# 	cPickle.dump(episodes, pickle_file, protocol=cPickle.HIGHEST_PROTOCOL)
-
 		# Actual training per given episode over a set number of experiences (training iterations)
 
 		# flatten the experiences list for learning
-		flat_experiences = [x for l in experiences for x in l]
+		random_experiences = [x for l in experiences for x in l]
 
-		# collect random batch of experiences
-		# random_ix = list(np.random.randint(0, len(flat_experiences), number_of_experiences_to_train_from))
-		# random_experiences = np.array(flat_experiences)[random_ix]
-		
-		random_experiences = np.array(flat_experiences)
+		random_experiences = np.array(random_experiences)
 
 		# calculating the Q values for the initial state
-		initial_state = np.array([state[0] for state in random_experiences]).squeeze(1)
-		initial_Q = Q_net.predict(initial_state, number_of_experiences_to_train_from)
+		initial_state_im = np.array([state[0][0] for state in random_experiences]).squeeze(1)
+		initial_state_hist = np.array([state[0][1] for state in random_experiences]).squeeze(1)
+		initial_Q = Q_net.predict([initial_state_im,initial_state_hist], number_of_experiences_to_train_from, verbose=1)
+		initial_Q = initial_Q[0]
 
 		# calculating the Q values for the next state
-		next_state = np.array([state[3] for state in random_experiences]).squeeze(1)
-		next_Q = Q_net.predict(next_state, number_of_experiences_to_train_from)
-		
+		next_state_im = np.array([state[4][0] for state in random_experiences]).squeeze(1)
+		next_state_hist = np.array([state[4][1] for state in random_experiences]).squeeze(1)
+		next_Q_max = Q_net.predict([next_state_im,next_state_hist], number_of_experiences_to_train_from, verbose=1)
+
 		# calculating the maximum Q for the next state
-		next_Q_max = next_Q.max(axis=1)
+		next_Q_max = next_Q_max[0].max(axis=1)
 
 		# get the reward for a given experience
-		# random_reward = np.expand_dims(random_experiences[:, 2], 1)
 		random_reward = random_experiences[:, 2]
 
 		# get the action of a given experience
 		random_actions = np.expand_dims(random_experiences[:, 1], 1)
-		flat_actions = [x for l in random_actions for x in l]
+		random_actions = [x for l in random_actions for x in l]
+
+		# get the label of a given experience
+		random_labels = random_experiences[:, 3]
+		random_labels = np.vstack(random_labels)
 
 		# collect the indexes of terminal actions and set next state Q value to 0
 		# if the terminal action is selected the episode ends and there should be no additional reward
-		terminal_indices = [i for i, x in enumerate(flat_actions) if x == number_of_actions-1]
+		terminal_indices = [i for i, x in enumerate(random_actions) if x == number_of_actions-1]
 		next_Q_max[terminal_indices] = 0
 
 		# discount the future reward, i.e the Q value output
@@ -304,10 +299,10 @@ for episode in range(episodes):
 		target_repeated = np.matlib.repmat(target, 5, 1).T
 
 		# this takes the initial Q values for the state and replaces only the Q values for the actions that were used to the new target, else the error should be 0
-		initial_Q[np.arange(len(initial_Q)), flat_actions] = target_repeated[np.arange(len(target_repeated)), flat_actions]
+		initial_Q[np.arange(len(initial_Q)), random_actions] = target_repeated[np.arange(len(target_repeated)), random_actions]
 
 		before = time.time()
-		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, shuffle=True, verbose=0, callbacks=callbacks_list, validation_split=0.2)
+		Q_net.fit([initial_state_im, initial_state_hist], [initial_Q, random_labels], epochs=training_epochs, batch_size=batch_size, shuffle=True, verbose=1, callbacks=callbacks_list, validation_split=0.2)
 		after = time.time()
 		print("Time taken =", after-before)
 
@@ -334,5 +329,3 @@ with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
 	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
 	details.writerow(log_names)	
 	details.writerow(log_vars)
-	
-
