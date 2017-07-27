@@ -98,6 +98,7 @@ def crop_image(im, bb_in, region):
 	x_start = new_bb[0,1]
 	x_end = new_bb[1,1]
 
+	# crop image to new boundingbox extents
 	im = im[int(y_start):int(y_end), int(x_start):int(x_end), :]
 	return im, new_bb
 

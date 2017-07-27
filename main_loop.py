@@ -6,29 +6,26 @@ import random
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
-
 from keras.callbacks import ModelCheckpoint
-import cPickle
+from keras import backend as K
+K.set_image_dim_ordering('tf')
 
-### Local helpers
+# Local helpers
 import image_actions
 import reinforcement_helper
 import action_functions
 import image_loader
 import image_augmentation
 
-### set backend to tensorflow
-from keras import backend as K
-K.set_image_dim_ordering('tf')
+## parser for the input - To implement
+# parser = argparse.ArgumentParser(description = 'Epoch: ')
+# parser.add_argument('-n', metavar='N', type=int, default=0)
+# parser.add_argument("-i", "--image", help="path to the input image")
+# args = vars(parser.parse_args())
+# epochs_id = args['n']
+# image = args['image']
 
-# parser for the input, defining the number of training epochs and an image
-parser = argparse.ArgumentParser(description = 'Epoch: ')
-parser.add_argument('-n', metavar='N', type=int, default=0)
-parser.add_argument("-i", "--image", help="path to the input image")
-args = vars(parser.parse_args())
-epochs_id = args['n']
-image = args['image']
-
+# Paths
 project_root = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/'
 VOC2007_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2007'
 VOC2012_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2012'
@@ -41,10 +38,6 @@ img_name_list_2007 = image_actions.get_img_names(VOC2007_path, desired_class_set
 img_list_2007 = image_actions.load_images(VOC2007_path, img_name_list_2007) 
 img_list_2007, groundtruths_2007, img_name_list_2007 = image_loader.get_class_images(VOC2007_path, desired_class, img_name_list_2007, img_list_2007)
 
-
-desired_class_set = 'aeroplane_train'
-desired_class = 'aeroplane'
-
 ### loading up VOC2012 images of a given class
 img_name_list_2012 = image_actions.get_img_names(VOC2012_path, desired_class_set)
 img_list_2012 = image_actions.load_images(VOC2012_path, img_name_list_2012) 
@@ -55,96 +48,74 @@ img_list = img_list_2007+img_list_2012
 groundtruths = groundtruths_2007+groundtruths_2012
 img_name_list = img_name_list_2007+img_name_list_2012
 
-
-# DEBUG: Overfitting hack
-#img_list = [img_list[0]] *100
-#groundtruths = [groundtruths[0]] *100
-
+# Constants
 number_of_actions = 5
 history_length = 8
 Q_net_input_size = (25128, )
+visual_descriptor_size = 25088
 
 
+# Models
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
-
-# initialise Q network (randomly or with existing weights)
+# initialise Q network (randomly or with existing weights) 
 #loaded_weights_name = 'combi_aeroplane_180717_02_appr_forcedIOU06_augoff.hdf5'
 #loaded_weights = project_root+'project_code/network_weights/'+loaded_weights_name
 loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
-# setting up callback to save best model
+# Validation callback
 saved_weights = 'test_again.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
 
-### Q network definition
+
+# Training Parameters
 episodes = 50
-
-# random action probability
 epsilon = 1
-
-# discount factor for future rewards
 gamma = 0.9
-
-visual_descriptor_size = 25088
-
-# set the number of experiences to train from for each episode and batch size
-conv_predict_batch_size = 40 # 40 maximum for 1060 apparently before memory related issues
-Q_predict_batch_size = 5000
-Q_train_batch_size = 10000
-
+T = 39
+force_terminal = 0.6 # IoU to force terminal action
 training_epochs = 100
 
-# number of actions taken per image
-T = 39
 
-# IOU at which the terminal action is triggered (guided learning approach)
-force_terminal = 0.6
-
-# image data splits - lowers memory consumption per episode by only processing a subset at a time
-# when selecting the chunk factor take into account the dataset size and number of actions taken
-# with the full dataset and 40 actions, a chunk factor of 8 or so should be used
-chunk_factor = 2
+# example/batch size handling (controls for RAM VRAM constraints)
+conv_predict_batch_size = 40 # Decrease value if low on VRAM
+Q_predict_batch_size = 10000
+Q_train_batch_size = 1000
+chunk_factor = 2 # Increase value if low on RAM
 chunk_size = int(len(img_list)/chunk_factor)
 
 
-
-# some metrics to collect in training
-# collect the counts of actions in each episode of training
+# Metric collection during training process
 action_counts = []
 avg_reward = []
 
-# loop through images
+
 for episode in range(episodes):
-	print("this is episode:", episode)
+	print("Episode:", episode)
 
-	# collect count of actions in the episode
+
+	# initialise collections for per episode metrics
 	action_count = [0,0,0,0,0]
-
-	# collect the summation of rewards for an episode
 	reward_summation = 0
 
 	for chunk in range(chunk_factor):
-
-
-		# list to store experiences, new one for each episode (run through all images with a set epislon value)
+		# list to store experiences, new one for each episode
 		experiences = []
 
 		# change the exploration-eploitation tradeoff as the episode count increases (0.9 to 0.1)
 		if epsilon > 0.11:
 			epsilon = epsilon -  0.1
 
-
 		# determines the offset to use when iterating through the chunk
 		chunk_offset = chunk*chunk_size
 
 		# iteration through all images in the current chunk
 		for image_ix in range(chunk_offset,chunk_offset + chunk_size):
-			print("image", image_ix)
+			print("Image:", image_ix)
 
 			# get initial parameters for each image
 			original_image = np.array(img_list[image_ix])
@@ -179,27 +150,18 @@ for episode in range(episodes):
 			# preprocess the image
 			preprocessed_image = image_actions.image_preprocessing(original_image)
 
-			# get the state vector (conv output of VGG16 concatenated with the action history)
-			# state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv) CHANGED!!!
-
-
-			# dumb trick to separate experiences for each image
+			# intiialise experience subcontainer for each image
 			experiences.append([])
 
 			# collecting the preprocessed images in a separate list
 			preprocessed_list = []
 
 			for t in range(T):
-
-				# add the current state to the experience list
-
-				# experiences[image_ix - chunk_offset].append([preprocessed_image]) # ADDED!!!
-
 				# collect the preprocessed image
 				preprocessed_list.append(preprocessed_image)
-				# experiences[image_ix-chunk_offset][t].append(np.array(np.reshape(history_vec, (number_of_actions*history_length)))) # ADDED!!!
-				experiences[image_ix-chunk_offset].append([np.array(np.reshape(history_vec, (number_of_actions*history_length)))]) # ADDED!!!
 
+				# add action history to experience collection
+				experiences[image_ix-chunk_offset].append([np.array(np.reshape(history_vec, (number_of_actions*history_length)))]) # ADDED!!!
 
 				# exploration or exploitation
 				if random.uniform(0,1) < epsilon:
@@ -210,11 +172,15 @@ for episode in range(episodes):
 					for act in range(number_of_actions-1):
 						potential_image, potential_boundingbox = action_functions.crop_image(original_image, boundingbox, act)            
 						potential_image_IOU = []
+
+						# check for IoU change for each action
 						for ground_truth in ground_image_bb_gt:
 							potential_iou = reinforcement_helper.IOU(ground_truth, potential_boundingbox)
 							potential_image_IOU.append(potential_iou)
 						if max(potential_image_IOU) >= max(image_IOU):
 							good_actions.append(act)
+
+					# make a selection out of the positive actions of possible
 					if len(good_actions) > 0:
 						good_actions.append(number_of_actions-1)
 						action = random.choice(good_actions)
@@ -226,12 +192,11 @@ for episode in range(episodes):
 				# this is done to help speed up the training process
 				elif max(image_IOU) > force_terminal:
 					action = number_of_actions-1
+				
+				# Exploitation
 				else:
 					state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv) ### ADDED!!!
-					# plug state into Q network
-
 					Q_vals = Q_net.predict(state_vec)
-					# select the action based on the highest Q value
 					action = np.argmax(Q_vals)
 
 
@@ -250,24 +215,19 @@ for episode in range(episodes):
 				# get reward if termination action is taken
 				reward = reinforcement_helper.get_reward(action, IOU_list, t)
 
-				# get the next state
-
 				# update history vector
 				history_vec[:, :-1] = history_vec[:,1:]
 				history_vec[:,-1] = [0,0,0,0,0] # hard coded actions here
 				history_vec[action, -1] = 1
 
 				preprocessed_image = image_actions.image_preprocessing(image)
-				# state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv) CHANGED!!!
 				
-				# add action, reward, and new state to the experience vector for the given image
+				# add action, reward, history to experience list
 				experiences[image_ix-chunk_offset][t].append(action)
 				experiences[image_ix-chunk_offset][t].append(reward)
-				# experiences[image_ix-chunk_offset][t].append(state_vec) CHANGED!!!
-				#experiences[image_ix-chunk_offset][t].append(preprocessed_image) # ADDED!!!
 				experiences[image_ix-chunk_offset][t].append(np.array(np.reshape(history_vec, (number_of_actions*history_length)))) # ADDED!!!
 
-				# increment the action used
+				# collect episode metrics
 				action_count[action] += 1
 				reward_summation += reward
 
