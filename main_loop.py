@@ -93,14 +93,14 @@ gamma = 0.9
 visual_descriptor_size = 25088
 
 # set the number of experiences to train from for each episode and batch size
-conv_predict_batch_size = 40 # ADDED!!!!
+conv_predict_batch_size = 40 # 40 maximum for 1060 apparently before memory related issues
 Q_predict_batch_size = 5000
 Q_train_batch_size = 10000
 
 training_epochs = 100
 
 # number of actions taken per image
-T = 40
+T = 39
 
 # IOU at which the terminal action is triggered (guided learning approach)
 force_terminal = 0.6
@@ -108,7 +108,7 @@ force_terminal = 0.6
 # image data splits - lowers memory consumption per episode by only processing a subset at a time
 # when selecting the chunk factor take into account the dataset size and number of actions taken
 # with the full dataset and 40 actions, a chunk factor of 8 or so should be used
-chunk_factor = 4
+chunk_factor = 2
 chunk_size = int(len(img_list)/chunk_factor)
 
 
@@ -186,13 +186,19 @@ for episode in range(episodes):
 			# dumb trick to separate experiences for each image
 			experiences.append([])
 
-			
+			# collecting the preprocessed images in a separate list
+			preprocessed_list = []
+
 			for t in range(T):
 
 				# add the current state to the experience list
-				# experiences[image_ix - chunk_offset].append([state_vec]) CHANGED!!!
-				experiences[image_ix - chunk_offset].append([preprocessed_image]) # ADDED!!!
-				experiences[image_ix-chunk_offset][t].append(np.array(np.reshape(history_vec, (number_of_actions*history_length)))) # ADDED!!!
+
+				# experiences[image_ix - chunk_offset].append([preprocessed_image]) # ADDED!!!
+
+				# collect the preprocessed image
+				preprocessed_list.append(preprocessed_image)
+				# experiences[image_ix-chunk_offset][t].append(np.array(np.reshape(history_vec, (number_of_actions*history_length)))) # ADDED!!!
+				experiences[image_ix-chunk_offset].append([np.array(np.reshape(history_vec, (number_of_actions*history_length)))]) # ADDED!!!
 
 
 				# exploration or exploitation
@@ -258,7 +264,7 @@ for episode in range(episodes):
 				experiences[image_ix-chunk_offset][t].append(action)
 				experiences[image_ix-chunk_offset][t].append(reward)
 				# experiences[image_ix-chunk_offset][t].append(state_vec) CHANGED!!!
-				experiences[image_ix-chunk_offset][t].append(preprocessed_image) # ADDED!!!
+				#experiences[image_ix-chunk_offset][t].append(preprocessed_image) # ADDED!!!
 				experiences[image_ix-chunk_offset][t].append(np.array(np.reshape(history_vec, (number_of_actions*history_length)))) # ADDED!!!
 
 				# increment the action used
@@ -266,10 +272,21 @@ for episode in range(episodes):
 				reward_summation += reward
 
 
-		# images to states
+
+			### CONVERTING COLLECTED IMAGES TO CONV OUTPUTS
+			# collect the last preprocessed image for this given image
+			preprocessed_list.append(preprocessed_image)
+
+			# preprocessed image -> conv output for a single image
+			conv_output = np.array(preprocessed_list).squeeze(1)
+			conv_output = vgg16_conv.predict(conv_output, conv_predict_batch_size, verbose=1)
+
+			[experiences[image_ix-chunk_offset][i].append(conv_output[i]) for i in range(T)]
+			[experiences[image_ix-chunk_offset][i].append(conv_output[i+1]) for i in range(T)]
+
+
 
 		# Actual training per given episode over a set number of experiences (training iterations)
-
 		# flatten the experiences list for learning
 		flat_experiences = [x for l in experiences for x in l]
 		num_of_experiences = len(flat_experiences) # ADDED!!!!
@@ -279,20 +296,15 @@ for episode in range(episodes):
 		# delete variables to free up memory
 		del flat_experiences
 
-		initial_state = np.array([state[0] for state in random_experiences]).squeeze(1) # ADDED!!!!
-		initial_state = vgg16_conv.predict(initial_state, conv_predict_batch_size, verbose=1) # CHANGED!!!!
-
-		next_state = np.array([state[4] for state in random_experiences]).squeeze(1)# ADDED!!!!
-		next_state = vgg16_conv.predict(next_state, conv_predict_batch_size, verbose=1) # CHANGED!!!!
-
-
+		initial_state = np.array([state[4] for state in random_experiences]) # ADDED!!!!
+		next_state = np.array([state[5] for state in random_experiences])# ADDED!!!!
 
 		# Creating the state (conv output + action history)
 		initial_state = np.reshape(initial_state, (num_of_experiences, visual_descriptor_size))
 		next_state = np.reshape(next_state, (num_of_experiences, visual_descriptor_size))
 
-		current_history_vec = np.vstack(random_experiences[:,1])
-		next_history_vec = np.vstack(random_experiences[:,5])
+		current_history_vec = np.vstack(random_experiences[:,0])
+		next_history_vec = np.vstack(random_experiences[:,3])
 
 		# appends history to conv output
 		initial_state = np.append(initial_state, current_history_vec, axis=1)
@@ -304,16 +316,15 @@ for episode in range(episodes):
 		# calculating the Q values for the next state
 		next_Q = Q_net.predict(next_state, Q_predict_batch_size, verbose=1)
 		
-
 		# calculating the maximum Q for the next state
 		next_Q_max = next_Q.max(axis=1)
 
 		# get the reward for a given experience
 		# random_reward = np.expand_dims(random_experiences[:, 2], 1)
-		random_reward = random_experiences[:, 3]
+		random_reward = random_experiences[:, 2]
 
 		# get the action of a given experience
-		random_actions = np.expand_dims(random_experiences[:, 2], 1)
+		random_actions = np.expand_dims(random_experiences[:, 1], 1)
 		flat_actions = [x for l in random_actions for x in l]
 
 		# collect the indexes of terminal actions and set next state Q value to 0
