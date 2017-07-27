@@ -4,9 +4,6 @@ def get_class_images(VOC_path, desired_class, img_name_list, img_list):
 	desired_class = image_actions.class_name_dict[desired_class]
 
 	### loading up VOC images of a given class
-	# img_name_list = image_actions.get_img_names(VOC_path, 'aeroplane_trainval')
-	# img_list = image_actions.load_images(VOC_path, img_name_list) 
-
 
 	desired_class_list_bb = []
 	desired_class_list_image = []

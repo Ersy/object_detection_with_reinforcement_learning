@@ -13,11 +13,11 @@ import cPickle
 ### Local helpers
 import image_actions
 import reinforcement_helper
-import action_functions_v2 as action_functions
-import get_correct_class_test
+import action_functions
+import image_loader
 import image_augmentation
 
-### 
+### set backend to tensorflow
 from keras import backend as K
 K.set_image_dim_ordering('tf')
 
@@ -39,7 +39,7 @@ desired_class = 'aeroplane'
 ### loading up VOC2007 images of a given class
 img_name_list_2007 = image_actions.get_img_names(VOC2007_path, desired_class_set)
 img_list_2007 = image_actions.load_images(VOC2007_path, img_name_list_2007) 
-img_list_2007, groundtruths_2007, img_name_list_2007 = get_correct_class_test.get_class_images(VOC2007_path, desired_class, img_name_list_2007, img_list_2007)
+img_list_2007, groundtruths_2007, img_name_list_2007 = image_loader.get_class_images(VOC2007_path, desired_class, img_name_list_2007, img_list_2007)
 
 
 desired_class_set = 'aeroplane_train'
@@ -48,7 +48,7 @@ desired_class = 'aeroplane'
 ### loading up VOC2012 images of a given class
 img_name_list_2012 = image_actions.get_img_names(VOC2012_path, desired_class_set)
 img_list_2012 = image_actions.load_images(VOC2012_path, img_name_list_2012) 
-img_list_2012, groundtruths_2012, img_name_list_2012 = get_correct_class_test.get_class_images(VOC2012_path, desired_class, img_name_list_2012, img_list_2012)
+img_list_2012, groundtruths_2012, img_name_list_2012 = image_loader.get_class_images(VOC2012_path, desired_class, img_name_list_2012, img_list_2012)
 
 ### combine 2007 and 2012 datasets
 img_list = img_list_2007+img_list_2012
