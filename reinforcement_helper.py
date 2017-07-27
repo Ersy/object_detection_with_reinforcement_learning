@@ -9,31 +9,43 @@ import numpy as np
 # Visual descriptor size
 visual_descriptor_size = 25088
 # Different actions that the agent can do
-number_of_actions = 6
+number_of_actions = 5
 
 # Number of actions in the past to retain
 past_action_val = 8
 
 movement_reward = 1
-terminal_reward = 3
-iou_threshold = 0.6
+
+
+terminal_reward_5 = 3
+terminal_reward_7 = 5
+terminal_reward_9 = 7
+
+iou_threshold_5 = 0.5
+iou_threshold_7 = 0.7
+iou_threshold_9 = 0.9
+
 
 
 def get_reward(action, IOU_list, t):
 	"""
 	generates the correct reward based on the result of the chosen action
 	"""
-	if action == 5:
-		if max(IOU_list[t+1]) > iou_threshold:
-			return terminal_reward
+	if action == number_of_actions-1:
+		if max(IOU_list[t+1]) > iou_threshold_9:
+			return terminal_reward_9
+		elif max(IOU_list[t+1]) > iou_threshold_7:
+			return terminal_reward_7
+		elif max(IOU_list[t+1]) > iou_threshold_5:
+			return terminal_reward_5
 		else:
-			return -terminal_reward
+			return -terminal_reward_5
 
 	else:
 		current_IOUs = IOU_list[t+1]
 		past_IOUs = IOU_list[t]
 		current_target = np.argmax(current_IOUs)
-		if current_IOUs[current_target] > 0:
+		if current_IOUs[current_target] - past_IOUs[current_target] > 0:
 			return movement_reward
 		else:
 			return -movement_reward
@@ -55,16 +67,17 @@ def get_state_as_vec(image, history_vector, model_vgg):
 
 def get_q_network(shape_of_input, number_of_actions, weights_path='0'):
 	model = Sequential()
-	model.add(Dense(1024, init='lecun_uniform', input_shape = shape_of_input))# shape, name: normal(shape, scale=0.01, name=name)))
+	model.add(Dense(1024, use_bias=True, init='lecun_uniform', input_shape = shape_of_input))
 	model.add(Activation('relu'))
 	model.add(Dropout(0.2))
-	model.add(Dense(1024, init='lecun_uniform'))# shape, name: normal(shape, scale=0.01, name=name)))
+	model.add(Dense(1024, use_bias=True, init='lecun_uniform'))
 	model.add(Activation('relu'))
 	model.add(Dropout(0.2))
-	model.add(Dense(number_of_actions, init='lecun_uniform'))#lambda shape, name: normal(shape, scale=0.01, name=name)))
+	model.add(Dense(number_of_actions, use_bias=True, init='lecun_uniform'))
 	model.add(Activation('linear'))
-	adam = Adam(lr=1e-6)
-	model.compile(loss='mse', optimizer=adam)
+	# adam = Adam(lr=1e-6)
+	nadam = Nadam()
+	model.compile(loss='mse', optimizer=nadam)
 	if weights_path != "0":
 		model.load_weights(weights_path)
 	return model
@@ -74,19 +87,23 @@ def IOU(bb, bb_gt):
 	"""
 	Calculates the intersection-over-union for two bounding boxes
 	"""
-	yA = max(bb[0,0], bb_gt[0,0])
-	xA = max(bb[0,1], bb_gt[0,1])
-	yB = min(bb[1,0], bb_gt[1,0])
-	xB = min(bb[1,1], bb_gt[1,1])
+	x1 = max(bb[0,1], bb_gt[0,1])
+	y1 = max(bb[0,0], bb_gt[0,0])
+	x2 = min(bb[1,1], bb_gt[1,1])
+	y2 = min(bb[1,0], bb_gt[1,0])
 
-	interArea = (xB - xA + 1) * (yB - yA + 1)
+	w = x2-x1+1
+	h = y2-y1+1
 
-	bb_Area = (bb[1,0] - bb[0,0] + 1) * (bb[1,1] - bb[0,1] + 1)
-	bb_gt_Area = (bb_gt[1,0] - bb_gt[0,0] + 1) * (bb_gt[1,1] - bb_gt[0,1] + 1)
-
-	iou = interArea / float(bb_Area + bb_gt_Area - interArea)
-	if iou < 0:
+	inter = w*h
+	
+	aarea = (bb[1,1]-bb[0,1]+1) * (bb[1,0]-bb[0,0]+1)
+	
+	barea = (bb_gt[1,1]-bb_gt[0,1]+1) * (bb_gt[1,0]-bb_gt[0,0]+1)
+	# intersection over union overlap
+	iou = np.float32(inter) / (aarea+barea-inter)
+	# set invalid entries to 0 iou - occurs when there is no overlap in x and y
+	if iou < 0 or iou > 1:
 		return 0
 	return iou
-
 
