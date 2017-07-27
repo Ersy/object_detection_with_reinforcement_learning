@@ -36,7 +36,7 @@ image = args['image']
 
 
 ### loading up VOC images of a given class
-class_file = 'aeroplane_test'
+class_file = 'aeroplane_trainval'
 img_name_list = image_actions.get_img_names(VOC_path, class_file)
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 

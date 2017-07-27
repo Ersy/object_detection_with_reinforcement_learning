@@ -76,7 +76,7 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # setting up callback to save best model
-saved_weights = 'modelbesttest_stagedreward_50.hdf5'
+saved_weights = 'test_again.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 callbacks_list = [checkpoint]
@@ -90,9 +90,12 @@ epsilon = 1
 # discount factor for future rewards
 gamma = 0.9
 
+visual_descriptor_size = 25088
+
 # set the number of experiences to train from for each episode and batch size
-number_of_experiences_to_train_from = 5000
-batch_size = 2500
+conv_predict_batch_size = 40 # ADDED!!!!
+Q_predict_batch_size = 5000
+Q_train_batch_size = 10000
 
 training_epochs = 100
 
@@ -107,6 +110,8 @@ force_terminal = 0.6
 # with the full dataset and 40 actions, a chunk factor of 8 or so should be used
 chunk_factor = 4
 chunk_size = int(len(img_list)/chunk_factor)
+
+
 
 # some metrics to collect in training
 # collect the counts of actions in each episode of training
@@ -175,7 +180,8 @@ for episode in range(episodes):
 			preprocessed_image = image_actions.image_preprocessing(original_image)
 
 			# get the state vector (conv output of VGG16 concatenated with the action history)
-			state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
+			# state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv) CHANGED!!!
+
 
 			# dumb trick to separate experiences for each image
 			experiences.append([])
@@ -184,8 +190,9 @@ for episode in range(episodes):
 			for t in range(T):
 
 				# add the current state to the experience list
-				experiences[image_ix - chunk_offset].append([state_vec])
-
+				# experiences[image_ix - chunk_offset].append([state_vec]) CHANGED!!!
+				experiences[image_ix - chunk_offset].append([preprocessed_image]) # ADDED!!!
+				experiences[image_ix-chunk_offset][t].append(np.array(np.reshape(history_vec, (number_of_actions*history_length)))) # ADDED!!!
 
 
 				# exploration or exploitation
@@ -214,7 +221,9 @@ for episode in range(episodes):
 				elif max(image_IOU) > force_terminal:
 					action = number_of_actions-1
 				else:
+					state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv) ### ADDED!!!
 					# plug state into Q network
+
 					Q_vals = Q_net.predict(state_vec)
 					# select the action based on the highest Q value
 					action = np.argmax(Q_vals)
@@ -243,50 +252,68 @@ for episode in range(episodes):
 				history_vec[action, -1] = 1
 
 				preprocessed_image = image_actions.image_preprocessing(image)
-				state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
+				# state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv) CHANGED!!!
 				
 				# add action, reward, and new state to the experience vector for the given image
 				experiences[image_ix-chunk_offset][t].append(action)
 				experiences[image_ix-chunk_offset][t].append(reward)
-				experiences[image_ix-chunk_offset][t].append(state_vec)
+				# experiences[image_ix-chunk_offset][t].append(state_vec) CHANGED!!!
+				experiences[image_ix-chunk_offset][t].append(preprocessed_image) # ADDED!!!
+				experiences[image_ix-chunk_offset][t].append(np.array(np.reshape(history_vec, (number_of_actions*history_length)))) # ADDED!!!
 
 				# increment the action used
 				action_count[action] += 1
 				reward_summation += reward
 
-		# pickle_path = "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/episodes/"
 
-		# with open(pickle_path+saved_weights+str(chunk)+'.pickle') as pickle_file:
-		# 	cPickle.dump(episodes, pickle_file, protocol=cPickle.HIGHEST_PROTOCOL)
+		# images to states
 
 		# Actual training per given episode over a set number of experiences (training iterations)
 
 		# flatten the experiences list for learning
 		flat_experiences = [x for l in experiences for x in l]
-
-		# collect random batch of experiences
-		# random_ix = list(np.random.randint(0, len(flat_experiences), number_of_experiences_to_train_from))
-		# random_experiences = np.array(flat_experiences)[random_ix]
+		num_of_experiences = len(flat_experiences) # ADDED!!!!
 		
 		random_experiences = np.array(flat_experiences)
 
+		# delete variables to free up memory
+		del flat_experiences
+
+		initial_state = np.array([state[0] for state in random_experiences]).squeeze(1) # ADDED!!!!
+		initial_state = vgg16_conv.predict(initial_state, conv_predict_batch_size, verbose=1) # CHANGED!!!!
+
+		next_state = np.array([state[4] for state in random_experiences]).squeeze(1)# ADDED!!!!
+		next_state = vgg16_conv.predict(next_state, conv_predict_batch_size, verbose=1) # CHANGED!!!!
+
+
+
+		# Creating the state (conv output + action history)
+		initial_state = np.reshape(initial_state, (num_of_experiences, visual_descriptor_size))
+		next_state = np.reshape(next_state, (num_of_experiences, visual_descriptor_size))
+
+		current_history_vec = np.vstack(random_experiences[:,1])
+		next_history_vec = np.vstack(random_experiences[:,5])
+
+		# appends history to conv output
+		initial_state = np.append(initial_state, current_history_vec, axis=1)
+		next_state = np.append(next_state, next_history_vec, axis=1)
+
 		# calculating the Q values for the initial state
-		initial_state = np.array([state[0] for state in random_experiences]).squeeze(1)
-		initial_Q = Q_net.predict(initial_state, number_of_experiences_to_train_from)
+		initial_Q = Q_net.predict(initial_state, Q_predict_batch_size, verbose=1)
 
 		# calculating the Q values for the next state
-		next_state = np.array([state[3] for state in random_experiences]).squeeze(1)
-		next_Q = Q_net.predict(next_state, number_of_experiences_to_train_from)
+		next_Q = Q_net.predict(next_state, Q_predict_batch_size, verbose=1)
 		
+
 		# calculating the maximum Q for the next state
 		next_Q_max = next_Q.max(axis=1)
 
 		# get the reward for a given experience
 		# random_reward = np.expand_dims(random_experiences[:, 2], 1)
-		random_reward = random_experiences[:, 2]
+		random_reward = random_experiences[:, 3]
 
 		# get the action of a given experience
-		random_actions = np.expand_dims(random_experiences[:, 1], 1)
+		random_actions = np.expand_dims(random_experiences[:, 2], 1)
 		flat_actions = [x for l in random_actions for x in l]
 
 		# collect the indexes of terminal actions and set next state Q value to 0
@@ -307,9 +334,15 @@ for episode in range(episodes):
 		initial_Q[np.arange(len(initial_Q)), flat_actions] = target_repeated[np.arange(len(target_repeated)), flat_actions]
 
 		before = time.time()
-		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=batch_size, shuffle=True, verbose=0, callbacks=callbacks_list, validation_split=0.2)
+		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=Q_train_batch_size, shuffle=True, verbose=1, callbacks=callbacks_list, validation_split=0.2)
 		after = time.time()
 		print("Time taken =", after-before)
+
+		# delete variables to free up memory
+		del initial_state
+		del next_state
+		del random_experiences
+
 
 	# collect the counts of actions taken per episode
 	action_counts.append(action_count)
@@ -323,12 +356,12 @@ log_location = project_root + 'project_code/network_weights/logs/'
 
 log_names = ['loaded_weights','episodes', 'epsilon','gamma', 
 				'Time_steps', 'movement_reward', 'terminal_reward_5', 'terminal_reward_7', 'terminal_reward_9',
-				'iou_threshold_5', 'iou_threshold_7','iou_threshold_9','update_step', 'experiences_trained_over', 'force_terminal']
+				'iou_threshold_5', 'iou_threshold_7','iou_threshold_9','update_step', 'force_terminal']
 
 log_vars = [loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,
 			reinforcement_helper.terminal_reward_5,reinforcement_helper.terminal_reward_7,reinforcement_helper.terminal_reward_9,
 			reinforcement_helper.iou_threshold_5, reinforcement_helper.iou_threshold_7,reinforcement_helper.iou_threshold_9,
-			action_functions.update_step, number_of_experiences_to_train_from, force_terminal]
+			action_functions.update_step, force_terminal]
 
 with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
 	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
