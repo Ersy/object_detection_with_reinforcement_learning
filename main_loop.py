@@ -6,7 +6,7 @@ import random
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
 from keras import backend as K
 K.set_image_dim_ordering('tf')
 
@@ -38,6 +38,8 @@ img_name_list_2007 = image_actions.get_img_names(VOC2007_path, desired_class_set
 img_list_2007 = image_actions.load_images(VOC2007_path, img_name_list_2007) 
 img_list_2007, groundtruths_2007, img_name_list_2007 = image_loader.get_class_images(VOC2007_path, desired_class, img_name_list_2007, img_list_2007)
 
+desired_class_set = 'aeroplane_train'
+
 ### loading up VOC2012 images of a given class
 img_name_list_2012 = image_actions.get_img_names(VOC2012_path, desired_class_set)
 img_list_2012 = image_actions.load_images(VOC2012_path, img_name_list_2012) 
@@ -66,18 +68,20 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # Validation callback
-saved_weights = 'test_again.hdf5'
+saved_weights = 'aeroplane_290717.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
-callbacks_list = [checkpoint]
+Plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=20, verbose=1, mode='min', epsilon=0.0001, cooldown=0, min_lr=0)
+
+callbacks_list = []#[checkpoint]
 
 
 # Training Parameters
-episodes = 50
+episodes = 30
 epsilon = 1
 gamma = 0.9
-T = 39
-force_terminal = 0.6 # IoU to force terminal action
+T = 30
+force_terminal = 0.5 # IoU to force terminal action
 training_epochs = 100
 
 
@@ -308,6 +312,8 @@ for episode in range(episodes):
 		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=Q_train_batch_size, shuffle=True, verbose=1, callbacks=callbacks_list, validation_split=0.2)
 		after = time.time()
 		print("Time taken =", after-before)
+		print("Saving weights...")
+		Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'+saved_weights)
 
 		# delete variables to free up memory
 		del initial_state
@@ -319,7 +325,7 @@ for episode in range(episodes):
 	action_counts.append(action_count)
 	avg_reward.append(float(reward_summation)/len(img_list))
 
-Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'+saved_weights)
+
 
 
 # Log of training parameters

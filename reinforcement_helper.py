@@ -1,6 +1,6 @@
 from keras.models import Sequential # part to build the mode
 from keras.layers.core import Dense, Dropout, Activation, Flatten # types of layers and associated functions
-from keras.optimizers import RMSprop, SGD, Adam #optimising method (cost function and update method)
+from keras.optimizers import RMSprop, SGD, Nadam, Adam #optimising method (cost function and update method)
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
 from keras.initializers import normal, identity
 
@@ -26,8 +26,27 @@ iou_threshold_7 = 0.7
 iou_threshold_9 = 0.9
 
 
-
 def get_reward(action, IOU_list, t):
+	"""
+	generates the correct reward based on the result of the chosen action
+	"""
+	if action == number_of_actions-1:
+		if max(IOU_list[t+1]) > iou_threshold_5:
+			return terminal_reward_5
+		else:
+			return -terminal_reward_5
+
+	else:
+		current_IOUs = IOU_list[t+1]
+		past_IOUs = IOU_list[t]
+		current_target = np.argmax(current_IOUs)
+		if current_IOUs[current_target] - past_IOUs[current_target] > 0:
+			return movement_reward
+		else:
+			return -movement_reward
+
+
+def get_staged_reward(action, IOU_list, t):
 	"""
 	generates the correct reward based on the result of the chosen action
 	"""
@@ -75,9 +94,9 @@ def get_q_network(shape_of_input, number_of_actions, weights_path='0'):
 	model.add(Dropout(0.2))
 	model.add(Dense(number_of_actions, use_bias=True, init='lecun_uniform'))
 	model.add(Activation('linear'))
-	# adam = Adam(lr=1e-6)
-	nadam = Nadam()
-	model.compile(loss='mse', optimizer=nadam)
+	adam = Adam(lr=1e-6)
+	#nadam = Nadam()
+	model.compile(loss='mse', optimizer=adam)
 	if weights_path != "0":
 		model.load_weights(weights_path)
 	return model

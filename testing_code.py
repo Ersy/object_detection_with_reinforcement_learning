@@ -15,8 +15,8 @@ from keras.applications.vgg16 import preprocess_input, VGG16
 ### Local helpers
 import image_actions
 import reinforcement_helper
-import action_functions_v2 as action_functions
-import get_correct_class_test
+import action_functions
+import image_loader
 
 ### 
 from keras import backend as K
@@ -36,13 +36,13 @@ image = args['image']
 
 
 ### loading up VOC images of a given class
-class_file = 'aeroplane_trainval'
+class_file = 'person_trainval'
 img_name_list = image_actions.get_img_names(VOC_path, class_file)
 img_list = image_actions.load_images(VOC_path, img_name_list) 
 
-desired_class = 'aeroplane'
+desired_class = 'person'
 
-img_list, groundtruths, img_name_list = get_correct_class_test.get_class_images(VOC_path, desired_class, img_name_list, img_list)
+img_list, groundtruths, img_name_list = image_loader.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 
 
 # DEBUG: Overfitting hack
@@ -53,23 +53,24 @@ number_of_actions = 5
 history_length = 8
 Q_net_input_size = (25128, )
 
+
 ### VGG16 model without top
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 # path for non validated set
-#weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
+weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
 
-weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
+#weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'modelbesttest_stagedreward_50.hdf5'
+saved_weights = 'person_280717.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
 
 ### Q network definition
 epsilon = 0
-
+T = 50
 # stores proposal regions
 all_proposals = []
 
@@ -80,6 +81,8 @@ all_IOU = []
 
 all_actions = []
 
+all_image_scale= []
+
 # IOU for terminal actions - for use in calulating evaluation stats
 terminal_IOU = []
 terminal_index = []
@@ -87,15 +90,31 @@ terminal_index = []
 # loop through images
 for image_ix in range(len(img_list)):
 	
+	original_image = np.array(img_list[image_ix])
+
 	print("new image: ", image_ix)
 	# get initial parameters for each image
-	original_image = np.array(img_list[image_ix])
-	image = np.array(img_list[image_ix])
+
+	image = np.copy(original_image)
 	image_name = img_name_list[image_ix]
 	image_dimensions = image.shape[:-1]
 
 	# collect bounding boxes for each image
 	ground_image_bb_gt = groundtruths[image_ix]
+
+	# METRICS: get the scale of the object relative to the image size
+	
+	image_scale = []
+	for box in ground_image_bb_gt:
+
+		width = box[1][1] - box[0][1]
+		height = box[1][0] - box[0][0]
+		area = width*height
+
+		image_area = image_dimensions[0]*image_dimensions[1]
+
+		image_scale.append(float(area)/image_area)
+	all_image_scale.append(image_scale)
 
 	# add current image ground truth to all ground truths
 	all_ground_truth.append(ground_image_bb_gt)
@@ -132,7 +151,9 @@ for image_ix in range(len(img_list)):
 	# get the state vector (conv output of VGG16 concatenated with the action history)
 	state_vec = reinforcement_helper.get_state_as_vec(preprocessed_image, history_vec, vgg16_conv)
 
-	T = 50
+
+
+
 	for t in range(T):
 
 		# add the current state to the experience list
@@ -161,7 +182,7 @@ for image_ix in range(len(img_list)):
 			for ground_truth in ground_image_bb_gt:
 				current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
 				current_image_IOU.append(current_iou)
-			print("IOU: ", current_iou)
+			print("IOU: ", max(current_image_IOU))
 
 			terminal_IOU.append(max(current_image_IOU))
 			terminal_index.append(image_ix)
@@ -170,7 +191,8 @@ for image_ix in range(len(img_list)):
 
 			# implement something to mask the region covered by the boundingbox
 			# rerun for the image 
-			# image[boundingbox[0,0]:boundingbox[1,0], boundingbox[0,1]:boundingbox[1,1]] = mask
+			#mask =  [103.939, 116.779, 123.68]
+			#original_image[boundingbox[0,0]:boundingbox[1,0], boundingbox[0,1]:boundingbox[1,1]] = mask
 
 			break
 
@@ -229,26 +251,28 @@ t2 = [i for j in t1 for i in j]
 
 fig, ax = plt.subplots(3, 1)
 # code for investigating actions taken for different images - assessing the agent performance
+
+# objects with the final IoU above 0.5 (terminal action called)
 IOU_above_cutoff  = [i for i in t2 if i[-1]>=0.5]
-IOU_below_cutoff = [i for i in t2 if all(i)<0.5]
+
+# object 
+IOU_below_cutoff = [i for i in t2 if all(i)<0.5 and len(i) == T+1]
 for img in IOU_above_cutoff:
 	ax[0].plot(img)
 	ax[0].set_xlabel('action number')
 	ax[0].set_ylabel('IOU')
 ax[0].set_title('IOU above cutoff')
 
-#for img in IOU_below_cutoff:
-#	ax[1].plot(img)
-#	ax[1].set_xlabel('action number')
-#	ax[1].set_ylabel('IOU')
-#ax[1].set_title('IOU below cutoff')
-
+for img in IOU_below_cutoff:
+	ax[1].plot(img)
+	ax[1].set_xlabel('action number')
+	ax[1].set_ylabel('IOU')
+	ax[1].set_title('IOU below cutoff')
 
 # storing the number of actions taken before the terminal action
 action_count = [len(i) for i in all_actions if i[-1] == 4]
 action_count_mean = sum(action_count)/len(action_count)
 counter = collections.Counter(action_count)
-
 
 ax[2].bar(counter.keys(), counter.values())
 ax[2].set_xlabel("Number of actions taken")
@@ -299,8 +323,8 @@ false_pos_list = [i[0] for i in terminal_IOU_index if i[1] < 0.5]
 # calculate the reward in testing with different models
 # calculate expected return
 
-IOU_difference = [[k-j for j,k in zip(i[:-1], i[1:])] for i in t2]
 
+IOU_difference = [[k-j for j,k in zip(i[:-1], i[1:])] for i in t2]
 
 
 # Log of parameters and testing scores
