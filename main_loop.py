@@ -68,7 +68,7 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # Validation callback
-saved_weights = 'aeroplane_290717.hdf5'
+saved_weights = 'aeroplane_290717_2.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 Plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=20, verbose=1, mode='min', epsilon=0.0001, cooldown=0, min_lr=0)
@@ -78,7 +78,7 @@ callbacks_list = []#[checkpoint]
 
 # Training Parameters
 episodes = 30
-epsilon = 1
+epsilon = 1.1
 gamma = 0.9
 T = 30
 force_terminal = 0.5 # IoU to force terminal action
@@ -97,10 +97,16 @@ chunk_size = int(len(img_list)/chunk_factor)
 action_counts = []
 avg_reward = []
 
+episode_time = time.time()
 
 for episode in range(episodes):
 	print("Episode:", episode)
 
+	print("Time taken = ", time.time() - episode_time)
+	episode_time = time.time()
+	# change the exploration-eploitation tradeoff as the episode count increases (0.9 to 0.1)
+	if epsilon > 0.11:
+		epsilon = epsilon -  0.1
 
 	# initialise collections for per episode metrics
 	action_count = [0,0,0,0,0]
@@ -109,10 +115,6 @@ for episode in range(episodes):
 	for chunk in range(chunk_factor):
 		# list to store experiences, new one for each episode
 		experiences = []
-
-		# change the exploration-eploitation tradeoff as the episode count increases (0.9 to 0.1)
-		if epsilon > 0.11:
-			epsilon = epsilon -  0.1
 
 		# determines the offset to use when iterating through the chunk
 		chunk_offset = chunk*chunk_size
@@ -157,13 +159,16 @@ for episode in range(episodes):
 			# intiialise experience subcontainer for each image
 			experiences.append([])
 
-			# collecting the preprocessed images in a separate list
+			# collecting the preprocessed images in a separate list, the history, and an index of states already calculated
 			preprocessed_list = []
+			history_list = []
+			exploitation_index = []
+			exploitation_states = []
 
 			for t in range(T):
 				# collect the preprocessed image
 				preprocessed_list.append(preprocessed_image)
-
+				history_list.append(np.array(np.reshape(history_vec, (number_of_actions*history_length))))
 				# add action history to experience collection
 				experiences[image_ix-chunk_offset].append([np.array(np.reshape(history_vec, (number_of_actions*history_length)))]) # ADDED!!!
 
@@ -203,6 +208,10 @@ for episode in range(episodes):
 					Q_vals = Q_net.predict(state_vec)
 					action = np.argmax(Q_vals)
 
+					# collect the time step value for states that have already been calculated
+					exploitation_states.append(state_vec)
+					exploitation_index.append(t)
+
 
 				# if in training the termination action is used no need to get the subcrop again
 				if action != number_of_actions-1:
@@ -240,14 +249,40 @@ for episode in range(episodes):
 			### CONVERTING COLLECTED IMAGES TO CONV OUTPUTS
 			# collect the last preprocessed image for this given image
 			preprocessed_list.append(preprocessed_image)
+			
+			# collecting the final history state
+			final_history = np.array(np.reshape(history_vec, (number_of_actions*history_length)))
+			history_list.append(final_history)
+			history_arr = np.vstack(history_list)
+
+			# get the indexes that correspond to the conv_outputs
+			todo_states = [i for i in range(T+1) if i not in exploitation_index]
+			
 
 			# preprocessed image -> conv output for a single image
 			conv_output = np.array(preprocessed_list).squeeze(1)
-			conv_output = vgg16_conv.predict(conv_output, conv_predict_batch_size, verbose=1)
+			conv_output = vgg16_conv.predict(conv_output[todo_states], conv_predict_batch_size, verbose=1)
+			conv_output = np.reshape(conv_output, (conv_output.shape[0], visual_descriptor_size))
 
-			[experiences[image_ix-chunk_offset][i].append(conv_output[i]) for i in range(T)]
-			[experiences[image_ix-chunk_offset][i].append(conv_output[i+1]) for i in range(T)]
+			# get the precalculated states if any
+			try:
+				exploitation_states = np.vstack(exploitation_states)
+			except:
+				pass
 
+			# add the history to the conv_output, combine with exploitation states (if any) and reorder by timestep
+			conv_states = np.append(conv_output, history_arr[todo_states], axis=1)
+			try:
+				conv_states = np.append(conv_states, exploitation_states, axis=0)
+			except:
+				pass
+
+			# add the exploited indexes and sort conv_states back into the correct order
+			todo_states.extend(exploitation_index)
+			conv_states = [x for (y, x) in sorted(zip(todo_states, conv_states))]
+
+			[experiences[image_ix-chunk_offset][i].append(conv_states[i]) for i in range(T)]
+			[experiences[image_ix-chunk_offset][i].append(conv_states[i+1]) for i in range(T)]
 
 
 		# Actual training per given episode over a set number of experiences (training iterations)
@@ -264,15 +299,16 @@ for episode in range(episodes):
 		next_state = np.array([state[5] for state in random_experiences])# ADDED!!!!
 
 		# Creating the state (conv output + action history)
-		initial_state = np.reshape(initial_state, (num_of_experiences, visual_descriptor_size))
-		next_state = np.reshape(next_state, (num_of_experiences, visual_descriptor_size))
+		#!!!initial_state = np.reshape(initial_state, (num_of_experiences, visual_descriptor_size))
+		#!!!next_state = np.reshape(next_state, (num_of_experiences, visual_descriptor_size))
 
-		current_history_vec = np.vstack(random_experiences[:,0])
-		next_history_vec = np.vstack(random_experiences[:,3])
+		#!!!current_history_vec = np.vstack(random_experiences[:,0])
+		#!!!next_history_vec = np.vstack(random_experiences[:,3])
 
 		# appends history to conv output
-		initial_state = np.append(initial_state, current_history_vec, axis=1)
-		next_state = np.append(next_state, next_history_vec, axis=1)
+		#!!!initial_state = np.append(initial_state, current_history_vec, axis=1)
+		#!!!next_state = np.append(next_state, next_history_vec, axis=1)
+
 
 		# calculating the Q values for the initial state
 		initial_Q = Q_net.predict(initial_state, Q_predict_batch_size, verbose=1)
@@ -309,7 +345,7 @@ for episode in range(episodes):
 		initial_Q[np.arange(len(initial_Q)), flat_actions] = target_repeated[np.arange(len(target_repeated)), flat_actions]
 
 		before = time.time()
-		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=Q_train_batch_size, shuffle=True, verbose=1, callbacks=callbacks_list, validation_split=0.2)
+		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=Q_train_batch_size, shuffle=True, verbose=1)#, callbacks=callbacks_list, validation_split=0.2)
 		after = time.time()
 		print("Time taken =", after-before)
 		print("Saving weights...")
