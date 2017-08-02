@@ -8,6 +8,7 @@ import random
 import os
 import csv
 import collections
+import cPickle as pickle
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
@@ -34,16 +35,19 @@ args = vars(parser.parse_args())
 epochs_id = args['n']
 image = args['image']
 
+VOC = False
+if VOC:
+	### loading up VOC images of a given class
+	class_file = 'aeroplane_test'
+	img_name_list = image_actions.get_img_names(VOC_path, class_file)
+	img_list = image_actions.load_images(VOC_path, img_name_list) 
 
-### loading up VOC images of a given class
-class_file = 'aeroplane_trainval'
-img_name_list = image_actions.get_img_names(VOC_path, class_file)
-img_list = image_actions.load_images(VOC_path, img_name_list) 
+	desired_class = 'aeroplane'
 
-desired_class = 'aeroplane'
-
-img_list, groundtruths, img_name_list = image_loader.get_class_images(VOC_path, desired_class, img_name_list, img_list)
-
+	img_list, groundtruths, img_name_list = image_loader.get_class_images(VOC_path, desired_class, img_name_list, img_list)
+else:
+	img_list = pickle.load(open(project_root+'project_code/pickled_data/test_images_2_noisy.pickle', 'rb'))
+	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/test_bbs_2_noisy.pickle', 'rb'))
 
 # DEBUG: Overfitting hack
 #img_list = [img_list[0]] *2
@@ -63,7 +67,7 @@ weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final P
 #weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'aeroplane_290717.hdf5'
+saved_weights = 'gabor_010817_noisy.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -96,7 +100,7 @@ for image_ix in range(len(img_list)):
 	# get initial parameters for each image
 
 	image = np.copy(original_image)
-	image_name = img_name_list[image_ix]
+	#image_name = img_name_list[image_ix]
 	image_dimensions = image.shape[:-1]
 
 	# collect bounding boxes for each image
@@ -340,3 +344,5 @@ with open(log_location+saved_weights + '.csv', 'a') as csvfile:
 	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
 	details.writerow(log_names)	
 	details.writerow(log_vars)
+
+

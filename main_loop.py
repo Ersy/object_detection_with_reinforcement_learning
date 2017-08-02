@@ -3,6 +3,7 @@ import argparse
 import csv
 import time
 import random
+import cPickle as pickle
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
@@ -25,30 +26,41 @@ import image_augmentation
 # epochs_id = args['n']
 # image = args['image']
 
+VOC = False
+
 # Paths
 project_root = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/'
 VOC2007_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2007'
 VOC2012_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2012'
 
-desired_class_set = 'aeroplane_trainval'
-desired_class = 'aeroplane'
+if VOC == True:
+	desired_class_set = 'aeroplane_trainval'
+	desired_class = 'aeroplane'
 
-### loading up VOC2007 images of a given class
-img_name_list_2007 = image_actions.get_img_names(VOC2007_path, desired_class_set)
-img_list_2007 = image_actions.load_images(VOC2007_path, img_name_list_2007) 
-img_list_2007, groundtruths_2007, img_name_list_2007 = image_loader.get_class_images(VOC2007_path, desired_class, img_name_list_2007, img_list_2007)
+	### loading up VOC2007 images of a given class
+	img_name_list_2007 = image_actions.get_img_names(VOC2007_path, desired_class_set)
+	img_list_2007 = image_actions.load_images(VOC2007_path, img_name_list_2007) 
+	img_list_2007, groundtruths_2007, img_name_list_2007 = image_loader.get_class_images(VOC2007_path, desired_class, img_name_list_2007, img_list_2007)
 
-desired_class_set = 'aeroplane_train'
+	desired_class_set = 'aeroplane_train'
 
-### loading up VOC2012 images of a given class
-img_name_list_2012 = image_actions.get_img_names(VOC2012_path, desired_class_set)
-img_list_2012 = image_actions.load_images(VOC2012_path, img_name_list_2012) 
-img_list_2012, groundtruths_2012, img_name_list_2012 = image_loader.get_class_images(VOC2012_path, desired_class, img_name_list_2012, img_list_2012)
+	### loading up VOC2012 images of a given class
+	img_name_list_2012 = image_actions.get_img_names(VOC2012_path, desired_class_set)
+	img_list_2012 = image_actions.load_images(VOC2012_path, img_name_list_2012) 
+	img_list_2012, groundtruths_2012, img_name_list_2012 = image_loader.get_class_images(VOC2012_path, desired_class, img_name_list_2012, img_list_2012)
 
-### combine 2007 and 2012 datasets
-img_list = img_list_2007+img_list_2012
-groundtruths = groundtruths_2007+groundtruths_2012
-img_name_list = img_name_list_2007+img_name_list_2012
+	### combine 2007 and 2012 datasets
+	img_list = img_list_2007+img_list_2012
+	groundtruths = groundtruths_2007+groundtruths_2012
+	img_name_list = img_name_list_2007+img_name_list_2012
+
+else:
+	img_list = pickle.load(open(project_root+'project_code/pickled_data/training_images_2_noisy.pickle', 'rb'))
+	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/training_bbs_2_noisy.pickle', 'rb'))
+
+	#DEBUG: get a subset of the dataset for faster training
+	#img_list = img_list[:100]
+	#groundtruths = groundtruths[:100]
 
 # Constants
 number_of_actions = 5
@@ -68,7 +80,7 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # Validation callback
-saved_weights = 'aeroplane_290717_2.hdf5'
+saved_weights = 'gabor_020817_noisy.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 Plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=20, verbose=1, mode='min', epsilon=0.0001, cooldown=0, min_lr=0)
@@ -80,7 +92,7 @@ callbacks_list = []#[checkpoint]
 episodes = 30
 epsilon = 1.1
 gamma = 0.9
-T = 30
+T = 50
 force_terminal = 0.5 # IoU to force terminal action
 training_epochs = 100
 
@@ -96,6 +108,7 @@ chunk_size = int(len(img_list)/chunk_factor)
 # Metric collection during training process
 action_counts = []
 avg_reward = []
+
 
 episode_time = time.time()
 
@@ -201,6 +214,7 @@ for episode in range(episodes):
 				# this is done to help speed up the training process
 				elif max(image_IOU) > force_terminal:
 					action = number_of_actions-1
+					print("forced IOU")
 				
 				# Exploitation
 				else:
@@ -224,6 +238,9 @@ for episode in range(episodes):
 					current_iou = reinforcement_helper.IOU(ground_truth, boundingbox)
 					image_IOU.append(current_iou)
 				IOU_list.append(image_IOU)
+
+				if max(image_IOU) >= 0.5: 
+					print("IOU: ", max(image_IOU))
 
 				# get reward if termination action is taken
 				reward = reinforcement_helper.get_reward(action, IOU_list, t)
@@ -344,8 +361,13 @@ for episode in range(episodes):
 		# this takes the initial Q values for the state and replaces only the Q values for the actions that were used to the new target, else the error should be 0
 		initial_Q[np.arange(len(initial_Q)), flat_actions] = target_repeated[np.arange(len(target_repeated)), flat_actions]
 
+		# nicer names
+		training_input = initial_state
+		training_target = initial_Q
+
+
 		before = time.time()
-		Q_net.fit(initial_state, initial_Q, epochs=training_epochs, batch_size=Q_train_batch_size, shuffle=True, verbose=1)#, callbacks=callbacks_list, validation_split=0.2)
+		Q_net.fit(training_input, training_target, epochs=training_epochs, batch_size=Q_train_batch_size, shuffle=True, verbose=1)#, callbacks=callbacks_list, validation_split=0.2)
 		after = time.time()
 		print("Time taken =", after-before)
 		print("Saving weights...")

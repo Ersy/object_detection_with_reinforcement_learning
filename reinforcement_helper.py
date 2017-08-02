@@ -46,28 +46,28 @@ def get_reward(action, IOU_list, t):
 			return -movement_reward
 
 
-def get_staged_reward(action, IOU_list, t):
-	"""
-	generates the correct reward based on the result of the chosen action
-	"""
-	if action == number_of_actions-1:
-		if max(IOU_list[t+1]) > iou_threshold_9:
-			return terminal_reward_9
-		elif max(IOU_list[t+1]) > iou_threshold_7:
-			return terminal_reward_7
-		elif max(IOU_list[t+1]) > iou_threshold_5:
-			return terminal_reward_5
-		else:
-			return -terminal_reward_5
+# def get_reward(action, IOU_list, t):
+# 	"""
+# 	generates the correct reward based on the result of the chosen action
+# 	"""
+# 	if action == number_of_actions-1:
+# 		if max(IOU_list[t+1]) > iou_threshold_9:
+# 			return terminal_reward_9
+# 		elif max(IOU_list[t+1]) > iou_threshold_7:
+# 			return terminal_reward_7
+# 		elif max(IOU_list[t+1]) > iou_threshold_5:
+# 			return terminal_reward_5
+# 		else:
+# 			return -terminal_reward_5
 
-	else:
-		current_IOUs = IOU_list[t+1]
-		past_IOUs = IOU_list[t]
-		current_target = np.argmax(current_IOUs)
-		if current_IOUs[current_target] - past_IOUs[current_target] > 0:
-			return movement_reward
-		else:
-			return -movement_reward
+# 	else:
+# 		current_IOUs = IOU_list[t+1]
+# 		past_IOUs = IOU_list[t]
+# 		current_target = np.argmax(current_IOUs)
+# 		if current_IOUs[current_target] - past_IOUs[current_target] > 0:
+# 			return movement_reward
+# 		else:
+# 			return -movement_reward
 		
 
 
