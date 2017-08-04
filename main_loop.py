@@ -91,6 +91,7 @@ callbacks_list = []#[checkpoint]
 # Training Parameters
 episodes = 30
 epsilon = 1.1
+epsilon_decay = 0.1
 gamma = 0.9
 T = 50
 force_terminal = 0.5 # IoU to force terminal action
@@ -119,7 +120,7 @@ for episode in range(episodes):
 	episode_time = time.time()
 	# change the exploration-eploitation tradeoff as the episode count increases (0.9 to 0.1)
 	if epsilon > 0.11:
-		epsilon = epsilon -  0.1
+		epsilon = epsilon - epsilon_decay
 
 	# initialise collections for per episode metrics
 	action_count = [0,0,0,0,0]

@@ -3,13 +3,18 @@ import numpy as np
 import random
 import cPickle as pickle
 
+from scipy.ndimage import zoom
+import numpy as np
+import random
+
 class gabor_gen():
     
     def __init__(self, im_size):
         self.im_size = im_size
-        self.existing_gabor_loc = []
+        self.available_space = []
         
-    def gen_image(self, num_of_gabors, gabor_size, lambda_, theta,sigma, phase, noisy=False, beta=-2, random_scaling=False):
+    def gen_image(self, num_of_gabors, gabor_size, lambda_, theta,sigma, phase, 
+                  noisy=False, beta=-2, random_scaling=False, odd_one_out=False, overlap=False):
         """
         Generates an image of a select size with a select number of gabors
         """
@@ -24,30 +29,54 @@ class gabor_gen():
         else:
             im = x_mesh*0 + y_mesh*0
         
+        
+        # collection of all coordinates in grid
+        available_space = [(y,x) for y, x in zip(y_mesh.flatten(), x_mesh.flatten())]
+        # storage for collecting gabor locations
+        existing_gabor_loc = []
+        # storage for collecting gabor sizes
+        existing_gabor_size = []
+
         for gab in range(num_of_gabors):
+            
+            # hack to make the last gabor angle perpendicular to the rest
+            if odd_one_out and gab == num_of_gabors-1 and num_of_gabors>1:
+                theta = theta+90
+            
+            
+            # flag for random scaling of patches for variability
             scaling_factor = 1
+            if random_scaling:
+                scaling_factor = random.choice([1,2])
+        
             
             # create gabor and normalise
             gabor, gauss = self.gabor_patch(size=gabor_size, lambda_=lambda_,theta=theta,sigma=sigma, phase=phase)
+            gabor = zoom(gabor, scaling_factor)
+            gauss = zoom(gauss, scaling_factor)
             gabor = (gabor - gabor.mean())/gabor.std()
-            
-            # flag for random scaling of patches for variability
-            if random_scaling:
-                if bool(random.getrandbits(1)):
-                    scaling_factor = 2
-                    gabor = zoom(gabor, 2)
-            
+    
+            # get the scaled gabor size
             scaled_gabor_size = gabor_size*scaling_factor
             
-            x, y = self.gen_random_location(im_len, scaled_gabor_size)
             
-            # reduce noise in the gabor region by 1-gaussian then add gabor patch
-            im[y:y+scaled_gabor_size,x:x+scaled_gabor_size] = im[y:y+scaled_gabor_size,x:x+scaled_gabor_size]*(1-gauss)
-            im[y:y+scaled_gabor_size,x:x+scaled_gabor_size] = im[y:y+scaled_gabor_size,x:x+scaled_gabor_size]+gabor
+            # generate a random location to place the new gabor
+            #x, y = self.gen_random_location(im_len, scaled_gabor_size, existing_gabor_size, existing_gabor_loc, overlap)
+            try:
+                x, y = self.gen_random_location(available_space)
+                available_space = self.get_available_space(available_space, x, y, scaled_gabor_size, im_len)
 
+
+                # reduce noise in the gabor region by 1-gaussian then add gabor patch
+                im[y:y+scaled_gabor_size,x:x+scaled_gabor_size] = im[y:y+scaled_gabor_size,x:x+scaled_gabor_size]*(1-gauss)
+                im[y:y+scaled_gabor_size,x:x+scaled_gabor_size] = im[y:y+scaled_gabor_size,x:x+scaled_gabor_size]+gabor
+
+
+                bb.append(np.array([[y, x],[y+scaled_gabor_size, x+scaled_gabor_size]]))
+            except:
+                print('No space left!')
+                break
             
-            bb.append(np.array([[y, x],[y+scaled_gabor_size, x+scaled_gabor_size]]))
-
         # 0-255 mapping
         im = self._convert_to_im(im)
             
@@ -81,18 +110,37 @@ class gabor_gen():
         ret[:, :, 2] =  ret[:, :, 1] =  ret[:, :, 0] =  im
         return ret    
     
-    
-    def gen_random_location(self, im_len, gabor_size):
+    def gen_random_location(self, available_space):
         """
         Selects a random location within the bounds of the image
         """
-        x_choice = [x for x in im_len][:-gabor_size]
-        y_choice = [y for y in im_len][:-gabor_size]
-        x = int(np.random.choice(x_choice))
-        y = int(np.random.choice(y_choice))
-
-        return x, y
+        y, x = random.choice(available_space)
         
+        return x, y
+    
+    
+    def get_available_space(self, available_space, x, y, scaled_gabor_size, im_len):
+        """
+        update the available space list to remove the 
+        """
+        
+        
+        available_space = [(a,b) for a,b in available_space if ((a+scaled_gabor_size<y or b+scaled_gabor_size<x)
+                                                                or 
+                                                                (a>y+scaled_gabor_size or b>x+scaled_gabor_size))]
+        
+        
+        # get current available space to account for current gabor size hitting the edge
+        current_x = [x for x in im_len][:-scaled_gabor_size]
+        current_y = [y for y in im_len][:-scaled_gabor_size]
+        current_grid = np.meshgrid(current_y, current_x)
+        current_available_space = [(y,x) for y, x in zip(current_grid[0].flatten(), current_grid[1].flatten())]
+        
+        available_space = list(set(available_space).intersection(current_available_space))
+        
+        return available_space
+
+
     def spatial_noise(self, beta):
         """
         generates a noisy background with a given power spectrum
@@ -112,7 +160,7 @@ class gabor_gen():
         v = (np.hstack((v1, v2))/DIM[1])
         v = np.tile(v, (DIM[0],1))
 
-        Spatial_freq = np.power(np.power(u, 2) + np.power(v, 2), (BETA/2.0))
+        Spatial_freq = np.power(np.power(u, 2) + np.power(v, 2), (BETA/2))
 
         Spatial_freq[Spatial_freq == np.inf] =0
 
@@ -176,16 +224,23 @@ import matplotlib.pyplot as plt
 
 gabor_size=30
 sigma=5
-num_of_pics = 500
-num_of_gabors = 1
+num_of_pics = 1
+num_of_gabors = 120
 im_size = 224
 beta = -2
 noisy=True
 phase=0
 lambda_ = 6
 theta=0
+random_scaling = False
+odd_one_out = True
+overlap=False
 
-def generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, theta, phase, sigma, noisy):
+def generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, theta, phase, sigma, 
+                      noisy, random_scaling, odd_one_out, overlap):
+    """
+    Generates multiple images with the same gabor settings
+    """
     image_container = []
     bb_container = []
     gabor_instance = gabor_gen(im_size=im_size)
@@ -197,12 +252,15 @@ def generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, 
                                              phase=phase,
                                              sigma=sigma, 
                                              beta=beta, 
-                                             noisy=noisy)
+                                             noisy=noisy,
+                                             random_scaling=random_scaling,
+                                             odd_one_out=odd_one_out,
+                                             overlap=overlap)
         image_container.append(image)
         bb_container.append(bb)
     return image_container, bb_container
 
-train_images, train_bbs = generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, theta, phase, sigma, noisy)
-
+train_images, train_bbs = generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, theta, phase, sigma, 
+                                            noisy, random_scaling, odd_one_out, overlap)
 pickle.dump( train_images, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/test_images_2_noisy.pickle", "wb" ) )
 pickle.dump( train_bbs, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/test_bbs_2_noisy.pickle", "wb" ) )
