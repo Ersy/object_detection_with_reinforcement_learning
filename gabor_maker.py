@@ -11,7 +11,6 @@ class gabor_gen():
     
     def __init__(self, im_size):
         self.im_size = im_size
-        self.available_space = []
         
     def gen_image(self, num_of_gabors, gabor_size, lambda_, theta,sigma, phase, 
                   noisy=False, beta=-2, random_scaling=False, odd_one_out=False, overlap=False):
@@ -36,7 +35,8 @@ class gabor_gen():
         existing_gabor_loc = []
         # storage for collecting gabor sizes
         existing_gabor_size = []
-
+        
+        # create gabor patches in the image
         for gab in range(num_of_gabors):
             
             # hack to make the last gabor angle perpendicular to the rest
@@ -56,14 +56,21 @@ class gabor_gen():
             gauss = zoom(gauss, scaling_factor)
             gabor = (gabor - gabor.mean())/gabor.std()
     
+    
+            
+    
+    
             # get the scaled gabor size
-            scaled_gabor_size = gabor_size*scaling_factor
+            scaled_gabor_size = int(gabor_size*scaling_factor)
             
+            # remove the border area as available space based on the new gabor size
+            available_space = [(y, x) for y, x in available_space if x < self.im_size-scaled_gabor_size and y < self.im_size-scaled_gabor_size]
             
+
             # generate a random location to place the new gabor
-            #x, y = self.gen_random_location(im_len, scaled_gabor_size, existing_gabor_size, existing_gabor_loc, overlap)
-            try:
+            if available_space:
                 x, y = self.gen_random_location(available_space)
+                x, y = int(x), int(y)
                 available_space = self.get_available_space(available_space, x, y, scaled_gabor_size, im_len)
 
 
@@ -73,8 +80,8 @@ class gabor_gen():
 
 
                 bb.append(np.array([[y, x],[y+scaled_gabor_size, x+scaled_gabor_size]]))
-            except:
-                print('No space left!')
+            else:
+                print("No more space available after "+ str(gab) + " patches")
                 break
             
         # 0-255 mapping
@@ -160,7 +167,7 @@ class gabor_gen():
         v = (np.hstack((v1, v2))/DIM[1])
         v = np.tile(v, (DIM[0],1))
 
-        Spatial_freq = np.power(np.power(u, 2) + np.power(v, 2), (BETA/2))
+        Spatial_freq = np.power(np.power(u, 2) + np.power(v, 2), (BETA/2.0))
 
         Spatial_freq[Spatial_freq == np.inf] =0
 
@@ -224,8 +231,8 @@ import matplotlib.pyplot as plt
 
 gabor_size=30
 sigma=5
-num_of_pics = 1
-num_of_gabors = 120
+num_of_pics = 500
+num_of_gabors = 1
 im_size = 224
 beta = -2
 noisy=True
@@ -233,7 +240,7 @@ phase=0
 lambda_ = 6
 theta=0
 random_scaling = False
-odd_one_out = True
+odd_one_out = False
 overlap=False
 
 def generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, theta, phase, sigma, 
@@ -262,5 +269,5 @@ def generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, 
 
 train_images, train_bbs = generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, theta, phase, sigma, 
                                             noisy, random_scaling, odd_one_out, overlap)
-pickle.dump( train_images, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/test_images_2_noisy.pickle", "wb" ) )
-pickle.dump( train_bbs, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/test_bbs_2_noisy.pickle", "wb" ) )
+pickle.dump( train_images, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_2_Test_images.pickle", "wb" ) )
+pickle.dump( train_bbs, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_2_Test_boxes.pickle", "wb" ) )

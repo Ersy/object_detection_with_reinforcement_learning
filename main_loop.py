@@ -55,8 +55,10 @@ if VOC == True:
 	img_name_list = img_name_list_2007+img_name_list_2012
 
 else:
-	img_list = pickle.load(open(project_root+'project_code/pickled_data/training_images_2_noisy.pickle', 'rb'))
-	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/training_bbs_2_noisy.pickle', 'rb'))
+	patches_file = 'Experiment_2_Train_images.pickle'
+	patches_bb_file = 'Experiment_2_Train_boxes.pickle'
+	img_list = pickle.load(open(project_root+'project_code/pickled_data/'+patches_file, 'rb'))
+	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/'+patches_bb_file, 'rb'))
 
 	#DEBUG: get a subset of the dataset for faster training
 	#img_list = img_list[:100]
@@ -80,7 +82,7 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # Validation callback
-saved_weights = 'gabor_020817_noisy.hdf5'
+saved_weights = 'Experiment_2.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 Plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=20, verbose=1, mode='min', epsilon=0.0001, cooldown=0, min_lr=0)
@@ -109,6 +111,7 @@ chunk_size = int(len(img_list)/chunk_factor)
 # Metric collection during training process
 action_counts = []
 avg_reward = []
+std_reward = []
 
 
 episode_time = time.time()
@@ -124,7 +127,7 @@ for episode in range(episodes):
 
 	# initialise collections for per episode metrics
 	action_count = [0,0,0,0,0]
-	reward_summation = 0
+	episode_rewards = []
 
 	for chunk in range(chunk_factor):
 		# list to store experiences, new one for each episode
@@ -215,7 +218,6 @@ for episode in range(episodes):
 				# this is done to help speed up the training process
 				elif max(image_IOU) > force_terminal:
 					action = number_of_actions-1
-					print("forced IOU")
 				
 				# Exploitation
 				else:
@@ -240,9 +242,6 @@ for episode in range(episodes):
 					image_IOU.append(current_iou)
 				IOU_list.append(image_IOU)
 
-				if max(image_IOU) >= 0.5: 
-					print("IOU: ", max(image_IOU))
-
 				# get reward if termination action is taken
 				reward = reinforcement_helper.get_reward(action, IOU_list, t)
 
@@ -260,7 +259,7 @@ for episode in range(episodes):
 
 				# collect episode metrics
 				action_count[action] += 1
-				reward_summation += reward
+				episode_rewards.append(reward)
 
 
 
@@ -372,7 +371,7 @@ for episode in range(episodes):
 		after = time.time()
 		print("Time taken =", after-before)
 		print("Saving weights...")
-		Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'+saved_weights)
+		Q_net.save_weights('/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/final_weights/'+saved_weights)
 
 		# delete variables to free up memory
 		del initial_state
@@ -382,8 +381,8 @@ for episode in range(episodes):
 
 	# collect the counts of actions taken per episode
 	action_counts.append(action_count)
-	avg_reward.append(float(reward_summation)/len(img_list))
-
+	avg_reward.append(np.mean(episode_rewards))
+	std_reward.append(np.std(episode_rewards))
 
 
 
@@ -405,3 +404,14 @@ with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
 	details.writerow(log_vars)
 	
 
+# plotting average reward per action over each episode
+minus_std = [avg_reward[i] - std_reward[i] for i in range(len(avg_reward))]
+plus_std = [avg_reward[i] + std_reward[i] for i in range(len(avg_reward))]
+plt.plot(avg_reward, label='Average Reward', color='black')
+plt.plot(minus_std, label='-1 St. Dev', linestyle='--', color='red')
+plt.plot(plus_std, label='+1 St. Dev', linestyle='--', color='blue')
+plt.xlabel('Episode')
+plt.ylabel('Average Reward per Action')
+plt.title('Changes in Average Reward for each Action through the Learning Process')
+plt.legend()
+plt.show()
