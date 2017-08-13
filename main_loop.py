@@ -55,8 +55,8 @@ if VOC == True:
 	img_name_list = img_name_list_2007+img_name_list_2012
 
 else:
-	patches_file = 'Experiment_2_Train_images.pickle'
-	patches_bb_file = 'Experiment_2_Train_boxes.pickle'
+	patches_file = 'Experiment_7_Train_images.pickle'
+	patches_bb_file = 'Experiment_7_Train_boxes.pickle'
 	img_list = pickle.load(open(project_root+'project_code/pickled_data/'+patches_file, 'rb'))
 	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/'+patches_bb_file, 'rb'))
 
@@ -82,7 +82,7 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # Validation callback
-saved_weights = 'Experiment_2.hdf5'
+saved_weights = 'Experiment_7.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 Plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=20, verbose=1, mode='min', epsilon=0.0001, cooldown=0, min_lr=0)
@@ -98,7 +98,7 @@ gamma = 0.9
 T = 50
 force_terminal = 0.5 # IoU to force terminal action
 training_epochs = 100
-
+guided_learning = True # Flag for guided learning on exploration
 
 # example/batch size handling (controls for RAM VRAM constraints)
 conv_predict_batch_size = 40 # Decrease value if low on VRAM
@@ -181,6 +181,8 @@ for episode in range(episodes):
 			history_list = []
 			exploitation_index = []
 			exploitation_states = []
+			image_rewards = []
+
 
 			for t in range(T):
 				# collect the preprocessed image
@@ -192,27 +194,31 @@ for episode in range(episodes):
 				# exploration or exploitation
 				if random.uniform(0,1) < epsilon:
 		   
-					# adding apprenticeship learning step - only positive actions are chosen
-					good_actions = []
+		   			# limit exploration actions to only positive actions
+					if guided_learning:
 
-					for act in range(number_of_actions-1):
-						potential_image, potential_boundingbox = action_functions.crop_image(original_image, boundingbox, act)            
-						potential_image_IOU = []
+						# collect positive actions
+						good_actions = []
+						for act in range(number_of_actions-1):
+							potential_image, potential_boundingbox = action_functions.crop_image(original_image, boundingbox, act)            
+							potential_image_IOU = []
 
-						# check for IoU change for each action
-						for ground_truth in ground_image_bb_gt:
-							potential_iou = reinforcement_helper.IOU(ground_truth, potential_boundingbox)
-							potential_image_IOU.append(potential_iou)
-						if max(potential_image_IOU) >= max(image_IOU):
-							good_actions.append(act)
+							# check for IoU change for each action
+							for ground_truth in ground_image_bb_gt:
+								potential_iou = reinforcement_helper.IOU(ground_truth, potential_boundingbox)
+								potential_image_IOU.append(potential_iou)
+							if max(potential_image_IOU) >= max(image_IOU):
+								good_actions.append(act)
 
-					# make a selection out of the positive actions of possible
-					if len(good_actions) > 0:
-						good_actions.append(number_of_actions-1)
-						action = random.choice(good_actions)
+						# make a selection out of the positive actions of possible
+						if len(good_actions) > 0:
+							good_actions.append(number_of_actions-1)
+							action = random.choice(good_actions)
+						else:
+							action = random.randint(0, number_of_actions-1)
+
 					else:
 						action = random.randint(0, number_of_actions-1)
-
 					
 				# if the IOU is greater than 0.5 force the action to be the terminal action
 				# this is done to help speed up the training process
@@ -259,9 +265,9 @@ for episode in range(episodes):
 
 				# collect episode metrics
 				action_count[action] += 1
-				episode_rewards.append(reward)
+				image_rewards.append(reward)
 
-
+			episode_rewards.append(sum(image_rewards))
 
 			### CONVERTING COLLECTED IMAGES TO CONV OUTPUTS
 			# collect the last preprocessed image for this given image
@@ -300,6 +306,8 @@ for episode in range(episodes):
 
 			[experiences[image_ix-chunk_offset][i].append(conv_states[i]) for i in range(T)]
 			[experiences[image_ix-chunk_offset][i].append(conv_states[i+1]) for i in range(T)]
+
+
 
 
 		# Actual training per given episode over a set number of experiences (training iterations)
@@ -405,13 +413,15 @@ with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
 	
 
 # plotting average reward per action over each episode
+import matplotlib.pyplot as plt
+
 minus_std = [avg_reward[i] - std_reward[i] for i in range(len(avg_reward))]
 plus_std = [avg_reward[i] + std_reward[i] for i in range(len(avg_reward))]
 plt.plot(avg_reward, label='Average Reward', color='black')
 plt.plot(minus_std, label='-1 St. Dev', linestyle='--', color='red')
 plt.plot(plus_std, label='+1 St. Dev', linestyle='--', color='blue')
 plt.xlabel('Episode')
-plt.ylabel('Average Reward per Action')
-plt.title('Changes in Average Reward for each Action through the Learning Process')
+plt.ylabel('Average Reward per Image')
+plt.title('Changes in Average Reward for each Image through the Learning Process')
 plt.legend()
 plt.show()

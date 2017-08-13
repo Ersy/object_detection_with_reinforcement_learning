@@ -46,12 +46,13 @@ if VOC:
 
 	img_list, groundtruths, img_name_list = image_loader.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 else:
-	img_list = pickle.load(open(project_root+'project_code/pickled_data/test_images_2_noisy.pickle', 'rb'))
-	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/test_bbs_2_noisy.pickle', 'rb'))
+	class_file = 'Experiment_1'
+	img_list = pickle.load(open(project_root+'project_code/pickled_data/Experiment_6_Test_images.pickle', 'rb'))
+	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/Experiment_6_Test_boxes.pickle', 'rb'))
 
 # DEBUG: Overfitting hack
-#img_list = [img_list[0]] *2
-#groundtruths = [groundtruths[0]] *2
+# img_list = img_list[0:100]
+# groundtruths = groundtruths[0:100]
 
 number_of_actions = 5
 history_length = 8
@@ -62,12 +63,12 @@ Q_net_input_size = (25128, )
 vgg16_conv = VGG16(include_top=False, weights='imagenet')
 
 # path for non validated set
-weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
+#weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/no_validation/'
 
-#weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/'
+weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/final_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'gabor_010817_noisy.hdf5'
+saved_weights = 'Experiment_7.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -191,7 +192,7 @@ for image_ix in range(len(img_list)):
 			terminal_IOU.append(max(current_image_IOU))
 			terminal_index.append(image_ix)
 			action_list.append(action)
-			all_actions.append(action_list)
+			#all_actions.append(action_list)
 
 			# implement something to mask the region covered by the boundingbox
 			# rerun for the image 
@@ -253,14 +254,14 @@ t1 = [[list(j) for j in zip(*i)] for i in all_IOU]
 t2 = [i for j in t1 for i in j]
 
 
-fig, ax = plt.subplots(3, 1)
+fig, ax = plt.subplots(3, 1, sharex=True)
 # code for investigating actions taken for different images - assessing the agent performance
 
 # objects with the final IoU above 0.5 (terminal action called)
 IOU_above_cutoff  = [i for i in t2 if i[-1]>=0.5]
-
 # object 
-IOU_below_cutoff = [i for i in t2 if all(i)<0.5 and len(i) == T+1]
+IOU_below_cutoff = [i for i in t2 if i[-1]<0.5 and len(i) < T+1]
+
 for img in IOU_above_cutoff:
 	ax[0].plot(img)
 	ax[0].set_xlabel('action number')
@@ -289,20 +290,32 @@ ax[2].annotate('Mean: {:0.2f}'.format(action_count_mean), xy=(action_count_mean,
         arrowprops=dict(arrowstyle='-|>', fc='black', shrinkA=0, shrinkB=0,
                         connectionstyle='angle,angleA=0,angleB=90,rad=10'))
 
+plt.xlim(0,T)
+plt.tight_layout()
 plt.show()
 
 # calculating mAP
 # true positive -> IOU over 0.5 + terminal action
 # false positive -> IOU under 0.5 + terminal action
-# false negative -> no terminal action taken
+# false negative -> no terminal action taken when image contains an object
+# true negative -> no terminal action taken when image does not contain an object
 
 TP = sum([i>=0.5 for i in terminal_IOU])
 FP = sum([i<0.5 for i in terminal_IOU])
 FN = total_objects-(TP+FP)
 
 AP = float(TP)/(TP+FP)
-Recall = float(TP)/(TP+FN)
-F1 = AP*Recall/(AP+Recall)*2
+
+if TP+FN > 0:
+	Recall = float(TP)/(TP+FN)
+else:
+	Recall = 0
+
+if AP > 0:
+	F1 = AP*Recall/(AP+Recall)*2
+else:
+	F1 = 0
+
 
 print('precision = ', AP)
 print('recall = ', Recall)
@@ -310,10 +323,16 @@ print('F1 = ', F1)
 
 average_terminal_IOU = sum(terminal_IOU)/len(terminal_IOU)
 print("average terminal IOU = ", average_terminal_IOU)
-average_TP_IOU = sum([i for i in terminal_IOU if i>=0.5])/TP if TP >0 else 0
+average_TP_IOU = sum([i for i in terminal_IOU if i>=0.5])/TP if TP >0 else np.nan
 print("average TP IOU = ", average_TP_IOU)
-average_FP_IOU = sum([i for i in terminal_IOU if i<0.5])/FP if FP>0 else 0
+average_FP_IOU = sum([i for i in terminal_IOU if i<0.5])/FP if FP>0 else np.nan
 print("average FP IOU = ", average_FP_IOU)
+
+
+plt.hist([i for i in terminal_IOU if i>=0.5], bins=20, color='red')
+plt.hist([i for i in terminal_IOU if i<0.5], bins=20, color='blue')
+plt.xlim(0,1)
+plt.show()
 
 ###
 # Get examples of images that did not have terminal actions

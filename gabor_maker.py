@@ -7,13 +7,18 @@ from scipy.ndimage import zoom
 import numpy as np
 import random
 
+from scipy.ndimage import zoom
+import numpy as np
+import random
+
 class gabor_gen():
     
     def __init__(self, im_size):
         self.im_size = im_size
         
     def gen_image(self, num_of_gabors, gabor_size, lambda_, theta,sigma, phase, 
-                  noisy=False, beta=-2, random_scaling=False, odd_one_out=False, overlap=False):
+                  noisy=False, beta=-2, random_scaling=False, odd_one_out=False, 
+                  overlap=False, random_angles=False, occluded=False):
         """
         Generates an image of a select size with a select number of gabors
         """
@@ -40,15 +45,18 @@ class gabor_gen():
         for gab in range(num_of_gabors):
             
             # hack to make the last gabor angle perpendicular to the rest
-            if odd_one_out and gab == num_of_gabors-1 and num_of_gabors>1:
+            if odd_one_out and gab == 1:
                 theta = theta+90
             
+            # allow for random angle generation
+            if random_angles:
+                theta = random.choice([0,45,90,135,180,225,270,315])
             
             # flag for random scaling of patches for variability
             scaling_factor = 1
             if random_scaling:
-                scaling_factor = random.choice([1,2])
-        
+                scaling_factor = random.randint(1,3)
+
             
             # create gabor and normalise
             gabor, gauss = self.gabor_patch(size=gabor_size, lambda_=lambda_,theta=theta,sigma=sigma, phase=phase)
@@ -61,29 +69,64 @@ class gabor_gen():
     
     
             # get the scaled gabor size
-            scaled_gabor_size = int(gabor_size*scaling_factor)
+            scaled_gabor_size = gabor_size*scaling_factor
             
-            # remove the border area as available space based on the new gabor size
             available_space = [(y, x) for y, x in available_space if x < self.im_size-scaled_gabor_size and y < self.im_size-scaled_gabor_size]
-            
-
             # generate a random location to place the new gabor
+            #x, y = self.gen_random_location(im_len, scaled_gabor_size, existing_gabor_size, existing_gabor_loc, overlap)
             if available_space:
                 x, y = self.gen_random_location(available_space)
                 x, y = int(x), int(y)
-                available_space = self.get_available_space(available_space, x, y, scaled_gabor_size, im_len)
+                
+                if overlap == False:
+                    available_space = self.get_available_space(available_space, x, y, scaled_gabor_size, im_len)
+
+                    
+                
+                x_min = x
+                y_min = y
+                x_max = x+scaled_gabor_size
+                y_max = y+scaled_gabor_size
+                
+                if occluded:
+                    half_y = y+int(scaled_gabor_size/2)
+                    half_x = x+int(scaled_gabor_size/2)
+                    
+                    random_occlusion_x = random.randint(0,2)
+                    if random_occlusion_x == 0:
+                        x_min = half_x
+                    elif random_occlusion_x == 1:
+                        x_max = half_x
+
+                    random_occlusion_y = random.randint(0,2)
+                    if random_occlusion_y == 0:
+                        y_min = half_y
+                    elif random_occlusion_y == 1:
+                        y_max = half_y                    
+                    
+                
+                    im[y_min:y_max,x_min:x_max] = im[y_min:y_max,x_min:x_max]*(1-gauss[0+y_min-y:y_max-y, 0+x_min-x:x_max-x])
+                    im[y_min:y_max,x_min:x_max] = im[y_min:y_max,x_min:x_max]+gabor[0+y_min-y:y_max-y, 0+x_min-x:x_max-x]
+                
+                else:
+                    # reduce noise in the gabor region by 1-gaussian then add gabor patch
+                    im[y:y+scaled_gabor_size,x:x+scaled_gabor_size] = im[y:y+scaled_gabor_size,x:x+scaled_gabor_size]*(1-gauss)
+                    im[y:y+scaled_gabor_size,x:x+scaled_gabor_size] = im[y:y+scaled_gabor_size,x:x+scaled_gabor_size]+gabor
 
 
-                # reduce noise in the gabor region by 1-gaussian then add gabor patch
-                im[y:y+scaled_gabor_size,x:x+scaled_gabor_size] = im[y:y+scaled_gabor_size,x:x+scaled_gabor_size]*(1-gauss)
-                im[y:y+scaled_gabor_size,x:x+scaled_gabor_size] = im[y:y+scaled_gabor_size,x:x+scaled_gabor_size]+gabor
 
-
-                bb.append(np.array([[y, x],[y+scaled_gabor_size, x+scaled_gabor_size]]))
+                if occluded:
+                    bb.append(np.array([[y_min, x_min],[y_max, x_max]]))
+                else:
+                    bb.append(np.array([[y, x],[y+scaled_gabor_size, x+scaled_gabor_size]]))
             else:
                 print("No more space available after "+ str(gab) + " patches")
                 break
-            
+        
+        if odd_one_out:
+            bb = [bb[0]]
+        
+        
         # 0-255 mapping
         im = self._convert_to_im(im)
             
@@ -167,7 +210,7 @@ class gabor_gen():
         v = (np.hstack((v1, v2))/DIM[1])
         v = np.tile(v, (DIM[0],1))
 
-        Spatial_freq = np.power(np.power(u, 2) + np.power(v, 2), (BETA/2.0))
+        Spatial_freq = np.power(np.power(u, 2) + np.power(v, 2), (BETA/2))
 
         Spatial_freq[Spatial_freq == np.inf] =0
 
@@ -223,7 +266,6 @@ class gabor_gen():
         cropped_gauss = gauss[gauss < trim] = 0
 
         return grating * gauss, gauss
-        
 
 
 import matplotlib.patches as patches
@@ -235,16 +277,18 @@ num_of_pics = 500
 num_of_gabors = 1
 im_size = 224
 beta = -2
-noisy=True
+noisy=False
 phase=0
 lambda_ = 6
 theta=0
 random_scaling = False
 odd_one_out = False
 overlap=False
+random_angles = False
+occluded = True
 
 def generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, theta, phase, sigma, 
-                      noisy, random_scaling, odd_one_out, overlap):
+                      noisy, random_scaling, odd_one_out, overlap, random_angles, occluded):
     """
     Generates multiple images with the same gabor settings
     """
@@ -262,12 +306,14 @@ def generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, 
                                              noisy=noisy,
                                              random_scaling=random_scaling,
                                              odd_one_out=odd_one_out,
-                                             overlap=overlap)
+                                             overlap=overlap,
+                                             random_angles=random_angles,
+                                             occluded=occluded)
         image_container.append(image)
         bb_container.append(bb)
     return image_container, bb_container
 
 train_images, train_bbs = generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, theta, phase, sigma, 
-                                            noisy, random_scaling, odd_one_out, overlap)
-pickle.dump( train_images, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_2_Test_images.pickle", "wb" ) )
-pickle.dump( train_bbs, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_2_Test_boxes.pickle", "wb" ) )
+                                            noisy, random_scaling, odd_one_out, overlap, random_angles, occluded)
+pickle.dump( train_images, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_7_Test_images.pickle", "wb" ) )
+pickle.dump( train_bbs, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_7_Test_boxes.pickle", "wb" ) )
