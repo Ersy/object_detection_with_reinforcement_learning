@@ -91,14 +91,17 @@ class gabor_gen():
                 if occluded:
                     half_y = y+int(scaled_gabor_size/2)
                     half_x = x+int(scaled_gabor_size/2)
-                    
+                
                     random_occlusion_x = random.randint(0,2)
                     if random_occlusion_x == 0:
                         x_min = half_x
                     elif random_occlusion_x == 1:
                         x_max = half_x
 
-                    random_occlusion_y = random.randint(0,2)
+                    # trick to prevent full patches from being created
+                    y_occ = (1 if random_occlusion_x == 2 else 2)
+
+                    random_occlusion_y = random.randint(0,y_occ)
                     if random_occlusion_y == 0:
                         y_min = half_y
                     elif random_occlusion_y == 1:
@@ -205,12 +208,12 @@ class gabor_gen():
         u = np.tile(u, (DIM[1],1)).T
 
 
-        v1 = np.array(range(0,int(DIM[1]/2)+1, 1))
-        v2 = -np.array(range(int(np.ceil(DIM[1]/2))-1, 0, -1))
+        v1 = np.array(range(0,int(DIM[1]/2.0)+1, 1))
+        v2 = -np.array(range(int(np.ceil(DIM[1]/2.0))-1, 0, -1))
         v = (np.hstack((v1, v2))/DIM[1])
         v = np.tile(v, (DIM[0],1))
 
-        Spatial_freq = np.power(np.power(u, 2) + np.power(v, 2), (BETA/2))
+        Spatial_freq = np.power(np.power(u, 2) + np.power(v, 2), (BETA/2.0))
 
         Spatial_freq[Spatial_freq == np.inf] =0
 
@@ -273,11 +276,11 @@ import matplotlib.pyplot as plt
 
 gabor_size=30
 sigma=5
-num_of_pics = 500
+num_of_pics = 5
 num_of_gabors = 1
 im_size = 224
 beta = -2
-noisy=False
+noisy=True
 phase=0
 lambda_ = 6
 theta=0
@@ -315,5 +318,5 @@ def generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, 
 
 train_images, train_bbs = generate_x_images(num_of_pics, im_size, num_of_gabors, gabor_size, lambda_, theta, phase, sigma, 
                                             noisy, random_scaling, odd_one_out, overlap, random_angles, occluded)
-pickle.dump( train_images, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_7_Test_images.pickle", "wb" ) )
-pickle.dump( train_bbs, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_7_Test_boxes.pickle", "wb" ) )
+#pickle.dump( train_images, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_9_Test_images.pickle", "wb" ) )
+#pickle.dump( train_bbs, open( "/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/pickled_data/Experiment_9_Test_boxes.pickle", "wb" ) )

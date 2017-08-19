@@ -55,8 +55,8 @@ if VOC == True:
 	img_name_list = img_name_list_2007+img_name_list_2012
 
 else:
-	patches_file = 'Experiment_7_Train_images.pickle'
-	patches_bb_file = 'Experiment_7_Train_boxes.pickle'
+	patches_file = 'Experiment_22_Train_images.pickle'
+	patches_bb_file = 'Experiment_22_Train_boxes.pickle'
 	img_list = pickle.load(open(project_root+'project_code/pickled_data/'+patches_file, 'rb'))
 	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/'+patches_bb_file, 'rb'))
 
@@ -82,7 +82,7 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # Validation callback
-saved_weights = 'Experiment_7.hdf5'
+saved_weights = 'Experiment_2.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 Plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=20, verbose=1, mode='min', epsilon=0.0001, cooldown=0, min_lr=0)
@@ -322,17 +322,6 @@ for episode in range(episodes):
 
 		initial_state = np.array([state[4] for state in random_experiences]) # ADDED!!!!
 		next_state = np.array([state[5] for state in random_experiences])# ADDED!!!!
-
-		# Creating the state (conv output + action history)
-		#!!!initial_state = np.reshape(initial_state, (num_of_experiences, visual_descriptor_size))
-		#!!!next_state = np.reshape(next_state, (num_of_experiences, visual_descriptor_size))
-
-		#!!!current_history_vec = np.vstack(random_experiences[:,0])
-		#!!!next_history_vec = np.vstack(random_experiences[:,3])
-
-		# appends history to conv output
-		#!!!initial_state = np.append(initial_state, current_history_vec, axis=1)
-		#!!!next_state = np.append(next_state, next_history_vec, axis=1)
 
 
 		# calculating the Q values for the initial state

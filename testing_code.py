@@ -35,7 +35,7 @@ args = vars(parser.parse_args())
 epochs_id = args['n']
 image = args['image']
 
-VOC = False
+VOC = True
 if VOC:
 	### loading up VOC images of a given class
 	class_file = 'aeroplane_test'
@@ -46,13 +46,13 @@ if VOC:
 
 	img_list, groundtruths, img_name_list = image_loader.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 else:
-	class_file = 'Experiment_1'
-	img_list = pickle.load(open(project_root+'project_code/pickled_data/Experiment_6_Test_images.pickle', 'rb'))
-	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/Experiment_6_Test_boxes.pickle', 'rb'))
+	class_file = 'Experiment_2'
+	img_list = pickle.load(open(project_root+'project_code/pickled_data/Experiment_8_Test_images.pickle', 'rb'))
+	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/Experiment_8_Test_boxes.pickle', 'rb'))
 
 # DEBUG: Overfitting hack
-# img_list = img_list[0:100]
-# groundtruths = groundtruths[0:100]
+#img_list = img_list[0:8]
+#groundtruths = groundtruths[0:8]
 
 number_of_actions = 5
 history_length = 8
@@ -68,14 +68,14 @@ vgg16_conv = VGG16(include_top=False, weights='imagenet')
 weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/final_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'Experiment_7.hdf5'
+saved_weights = 'Aeroplane_3.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
 
 ### Q network definition
 epsilon = 0
-T = 50
+T = 60
 # stores proposal regions
 all_proposals = []
 
@@ -228,7 +228,7 @@ for image_ix in range(len(img_list)):
 
 # lets the proposals and ground truth bounding boxes be visualised
 ix = 0
-image_actions.view_results(img_list, all_ground_truth, all_proposals, ix)
+image_actions.view_results(img_list, all_ground_truth, all_proposals, all_IOU, ix)
 
 
 # simple evaluation metric
@@ -254,41 +254,47 @@ t1 = [[list(j) for j in zip(*i)] for i in all_IOU]
 t2 = [i for j in t1 for i in j]
 
 
-fig, ax = plt.subplots(3, 1, sharex=True)
+fig, ax = plt.subplots(4, 1, sharex=True)
 # code for investigating actions taken for different images - assessing the agent performance
 
 # objects with the final IoU above 0.5 (terminal action called)
 IOU_above_cutoff  = [i for i in t2 if i[-1]>=0.5]
+
 # object 
 IOU_below_cutoff = [i for i in t2 if i[-1]<0.5 and len(i) < T+1]
 
+# objects with no terminal action called
+IOU_no_terminal = [i for i in t2 if i[-1]<0.5 and len(i) == T+1]
+
 for img in IOU_above_cutoff:
 	ax[0].plot(img)
-	ax[0].set_xlabel('action number')
-	ax[0].set_ylabel('IOU')
+ax[0].set_ylabel('IOU')
 ax[0].set_title('IOU above cutoff')
+ax[0].set_ylim(0,1)
 
 for img in IOU_below_cutoff:
 	ax[1].plot(img)
-	ax[1].set_xlabel('action number')
-	ax[1].set_ylabel('IOU')
-	ax[1].set_title('IOU below cutoff')
+ax[1].set_ylabel('IOU')
+ax[1].set_title('IOU below cutoff')
+ax[1].set_ylim(0,1)
+
+for img in IOU_no_terminal:
+	ax[2].plot(img)
+ax[2].set_ylabel('IOU')
+ax[2].set_title('IOU no terminal actions')
+ax[2].set_ylim(0,1)
 
 # storing the number of actions taken before the terminal action
 action_count = [len(i) for i in all_actions if i[-1] == 4]
 action_count_mean = sum(action_count)/len(action_count)
 counter = collections.Counter(action_count)
 
-ax[2].bar(counter.keys(), counter.values())
-ax[2].set_xlabel("Number of actions taken")
-ax[2].set_ylabel("Count")
-ax[2].axvline(action_count_mean, color='red', linewidth=2)
-align = 'left'
-ax[2].annotate('Mean: {:0.2f}'.format(action_count_mean), xy=(action_count_mean, 1), xytext=(15, 15),
-        xycoords=('data', 'axes fraction'), textcoords='offset points',
-        horizontalalignment=align, verticalalignment='center',
-        arrowprops=dict(arrowstyle='-|>', fc='black', shrinkA=0, shrinkB=0,
-                        connectionstyle='angle,angleA=0,angleB=90,rad=10'))
+ax[3].bar(counter.keys(), counter.values())
+ax[3].set_xlabel("Actions taken")
+ax[3].set_ylabel("Count")
+ax[3].set_title('Actions per image (terminal action used)')
+ax[3].axvline(action_count_mean, color='red', linewidth=2, label='MEAN: '+str(action_count_mean)[:5])
+ax[3].legend()
 
 plt.xlim(0,T)
 plt.tight_layout()
@@ -323,15 +329,25 @@ print('F1 = ', F1)
 
 average_terminal_IOU = sum(terminal_IOU)/len(terminal_IOU)
 print("average terminal IOU = ", average_terminal_IOU)
+std_terminal_IOU = np.std(terminal_IOU)
+print("terminal IOU standard deviation = ", std_terminal_IOU)
 average_TP_IOU = sum([i for i in terminal_IOU if i>=0.5])/TP if TP >0 else np.nan
 print("average TP IOU = ", average_TP_IOU)
 average_FP_IOU = sum([i for i in terminal_IOU if i<0.5])/FP if FP>0 else np.nan
 print("average FP IOU = ", average_FP_IOU)
 
-
-plt.hist([i for i in terminal_IOU if i>=0.5], bins=20, color='red')
-plt.hist([i for i in terminal_IOU if i<0.5], bins=20, color='blue')
+# Plot distributions of terminal IOUs
+bins = np.arange(0,1,0.02)
+plt.hist([i for i in terminal_IOU if i>=0.5], bins=bins, color='red')
+plt.hist([i for i in terminal_IOU if i<0.5], bins=bins, color='blue')
 plt.xlim(0,1)
+plt.ylim(0,20)
+plt.axvline(average_terminal_IOU, color='black', label='MEAN: '+ str(average_terminal_IOU)[:5])
+plt.axvline(average_terminal_IOU-std_terminal_IOU, color='gray', linestyle='--', label='STDEV: '+ str(std_terminal_IOU)[:5])
+plt.axvline(average_terminal_IOU+std_terminal_IOU, color='gray', linestyle='--')
+plt.xlabel('IoU')
+plt.ylabel('Count')
+plt.legend()
 plt.show()
 
 ###

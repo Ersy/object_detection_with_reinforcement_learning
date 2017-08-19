@@ -114,6 +114,10 @@ def IOU(bb, bb_gt):
 	w = x2-x1+1
 	h = y2-y1+1
 
+	# handle odd cases of no intersection
+	if (w < 0 and h < 0):
+		return 0
+
 	inter = w*h
 	
 	aarea = (bb[1,1]-bb[0,1]+1) * (bb[1,0]-bb[0,0]+1)

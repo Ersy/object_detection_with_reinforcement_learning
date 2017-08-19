@@ -128,12 +128,13 @@ def image_preprocessing(im):
 	im = preprocess_input(im)
 	return im
 
-def view_results(im, groundtruth, proposals, ix):
+def view_results(im, groundtruth, proposals, all_IOU, ix):
 	"""
 	takes in an image set, ground truth bounding boxes, proposal bounding boxes, and an image index
 	prints out the image with the bouning boxes drawn in
 	"""
 	im = im[ix]
+	max_IOU = max(all_IOU[ix][-1])
 	proposals = proposals[ix]
 
 	fig, ax = plt.subplots(1)
@@ -148,6 +149,8 @@ def view_results(im, groundtruth, proposals, ix):
 	    height = proposal[1,0] - proposal[0,0]
 	    rect = patches.Rectangle(top_left, width, height, linewidth=2, edgecolor=c, facecolor='none') # change facecolor to add fill
 	    ax.add_patch(rect)
+	rect = patches.Rectangle(top_left, width, height, linewidth=2, edgecolor=c, facecolor='none' , label='Max IoU: '+str(max_IOU)[:5])
+	ax.add_patch(rect)
 
 	for ground_truth_box in groundtruth[ix]:
 	    top_left = (ground_truth_box[0,1], ground_truth_box[0,0])
@@ -156,4 +159,6 @@ def view_results(im, groundtruth, proposals, ix):
 	    rect = patches.Rectangle(top_left, width, height, linewidth=2, edgecolor='white', facecolor='none')
 	    ax.add_patch(rect)
 
+
+	plt.legend()
 	plt.show()
