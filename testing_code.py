@@ -46,7 +46,7 @@ if VOC:
 
 	img_list, groundtruths, img_name_list = image_loader.get_class_images(VOC_path, desired_class, img_name_list, img_list)
 else:
-	class_file = 'Experiment_2'
+	class_file = 'Experiment_1'
 	img_list = pickle.load(open(project_root+'project_code/pickled_data/Experiment_8_Test_images.pickle', 'rb'))
 	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/Experiment_8_Test_boxes.pickle', 'rb'))
 
@@ -68,7 +68,7 @@ vgg16_conv = VGG16(include_top=False, weights='imagenet')
 weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/final_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'Aeroplane_3.hdf5'
+saved_weights = 'Aeroplane_TEST.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
@@ -87,6 +87,7 @@ all_IOU = []
 all_actions = []
 
 all_image_scale= []
+all_image_centre = []
 
 # IOU for terminal actions - for use in calulating evaluation stats
 terminal_IOU = []
@@ -110,6 +111,7 @@ for image_ix in range(len(img_list)):
 	# METRICS: get the scale of the object relative to the image size
 	
 	image_scale = []
+	image_centre = []
 	for box in ground_image_bb_gt:
 
 		width = box[1][1] - box[0][1]
@@ -117,9 +119,10 @@ for image_ix in range(len(img_list)):
 		area = width*height
 
 		image_area = image_dimensions[0]*image_dimensions[1]
-
 		image_scale.append(float(area)/image_area)
+		image_centre.append([(box[1][0] + box[0][0])/2, (box[1][1] + box[0][1])/2])
 	all_image_scale.append(image_scale)
+	all_image_centre.append(image_centre)
 
 	# add current image ground truth to all ground truths
 	all_ground_truth.append(ground_image_bb_gt)
@@ -341,7 +344,7 @@ bins = np.arange(0,1,0.02)
 plt.hist([i for i in terminal_IOU if i>=0.5], bins=bins, color='red')
 plt.hist([i for i in terminal_IOU if i<0.5], bins=bins, color='blue')
 plt.xlim(0,1)
-plt.ylim(0,20)
+plt.ylim(0,500)
 plt.axvline(average_terminal_IOU, color='black', label='MEAN: '+ str(average_terminal_IOU)[:5])
 plt.axvline(average_terminal_IOU-std_terminal_IOU, color='gray', linestyle='--', label='STDEV: '+ str(std_terminal_IOU)[:5])
 plt.axvline(average_terminal_IOU+std_terminal_IOU, color='gray', linestyle='--')
@@ -364,6 +367,29 @@ false_pos_list = [i[0] for i in terminal_IOU_index if i[1] < 0.5]
 
 
 IOU_difference = [[k-j for j,k in zip(i[:-1], i[1:])] for i in t2]
+
+
+from scipy.interpolate import griddata
+yx = np.vstack(all_image_centre).T
+y = yx[0,:]
+x = yx[1,:]
+z = list(np.vstack([i[-1] for i in all_IOU]).T[0])
+xi = np.linspace(x.min(), x.max(), x.max()-x.min()+1)
+yi = np.linspace(y.min(), y.max(), y.max()-y.min()+1)
+zi = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
+
+zmin = 0.0
+zmax = 1.0
+zi[(zi<zmin)] = zmin
+zi[(zi>zmax)] = zmax
+
+cs = plt.contourf(xi, yi, zi, 15, cmap=plt.cm.rainbow, vmax=zmax, vmin=zmin)
+plt.colorbar()
+plt.show()
+
+
+
+
 
 
 # Log of parameters and testing scores

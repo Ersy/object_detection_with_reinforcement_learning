@@ -21,7 +21,7 @@ terminal_reward_5 = 3
 terminal_reward_7 = 5
 terminal_reward_9 = 7
 
-iou_threshold_5 = 0.5
+iou_threshold_5 = 0.7
 iou_threshold_7 = 0.7
 iou_threshold_9 = 0.9
 

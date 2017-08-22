@@ -26,7 +26,7 @@ import image_augmentation
 # epochs_id = args['n']
 # image = args['image']
 
-VOC = False
+VOC = True
 
 # Paths
 project_root = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/'
@@ -55,8 +55,8 @@ if VOC == True:
 	img_name_list = img_name_list_2007+img_name_list_2012
 
 else:
-	patches_file = 'Experiment_22_Train_images.pickle'
-	patches_bb_file = 'Experiment_22_Train_boxes.pickle'
+	patches_file = 'Experiment_2_Train_images.pickle'
+	patches_bb_file = 'Experiment_2_Train_boxes.pickle'
 	img_list = pickle.load(open(project_root+'project_code/pickled_data/'+patches_file, 'rb'))
 	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/'+patches_bb_file, 'rb'))
 
@@ -82,7 +82,7 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # Validation callback
-saved_weights = 'Experiment_2.hdf5'
+saved_weights = 'Aeroplane_TEST.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 Plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=20, verbose=1, mode='min', epsilon=0.0001, cooldown=0, min_lr=0)
@@ -96,7 +96,7 @@ epsilon = 1.1
 epsilon_decay = 0.1
 gamma = 0.9
 T = 50
-force_terminal = 0.5 # IoU to force terminal action
+force_terminal = 0.7 # IoU to force terminal action
 training_epochs = 100
 guided_learning = True # Flag for guided learning on exploration
 
@@ -104,7 +104,7 @@ guided_learning = True # Flag for guided learning on exploration
 conv_predict_batch_size = 40 # Decrease value if low on VRAM
 Q_predict_batch_size = 10000
 Q_train_batch_size = 1000
-chunk_factor = 2 # Increase value if low on RAM
+chunk_factor = 3 # Increase value if low on RAM
 chunk_size = int(len(img_list)/chunk_factor)
 
 
