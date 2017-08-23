@@ -1,7 +1,7 @@
 import numpy as np
 import argparse
 import matplotlib
-#matplotlib.use("webagg")
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import random
@@ -12,13 +12,14 @@ import cPickle as pickle
 
 from keras.applications import imagenet_utils
 from keras.applications.vgg16 import preprocess_input, VGG16
+from keras.preprocessing import image
 
 ### Local helpers
 import image_actions
 import reinforcement_helper
 import action_functions
 import image_loader
-from keras.preprocessing import image
+
 
 ### 
 from keras import backend as K

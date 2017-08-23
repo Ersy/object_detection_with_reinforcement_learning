@@ -18,20 +18,14 @@ import action_functions
 import image_loader
 import image_augmentation
 
-## parser for the input - To implement
-# parser = argparse.ArgumentParser(description = 'Epoch: ')
-# parser.add_argument('-n', metavar='N', type=int, default=0)
-# parser.add_argument("-i", "--image", help="path to the input image")
-# args = vars(parser.parse_args())
-# epochs_id = args['n']
-# image = args['image']
-
+# Flag to use either VOC dataset or patch dataset stored as pickle
 VOC = True
 
 # Paths
 project_root = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/'
 VOC2007_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2007'
 VOC2012_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2012'
+
 
 if VOC == True:
 	desired_class_set = 'aeroplane_trainval'
@@ -60,9 +54,7 @@ else:
 	img_list = pickle.load(open(project_root+'project_code/pickled_data/'+patches_file, 'rb'))
 	groundtruths = pickle.load(open(project_root+'project_code/pickled_data/'+patches_bb_file, 'rb'))
 
-	#DEBUG: get a subset of the dataset for faster training
-	#img_list = img_list[:100]
-	#groundtruths = groundtruths[:100]
+
 
 # Constants
 number_of_actions = 5
@@ -99,6 +91,8 @@ T = 50
 force_terminal = 0.7 # IoU to force terminal action
 training_epochs = 100
 guided_learning = True # Flag for guided learning on exploration
+augmented = False
+logging = False
 
 # example/batch size handling (controls for RAM VRAM constraints)
 conv_predict_batch_size = 40 # Decrease value if low on VRAM
@@ -121,7 +115,8 @@ for episode in range(episodes):
 
 	print("Time taken = ", time.time() - episode_time)
 	episode_time = time.time()
-	# change the exploration-eploitation tradeoff as the episode count increases (0.9 to 0.1)
+
+	# change the exploration-eploitation tradeoff as the episode count increases
 	if epsilon > 0.11:
 		epsilon = epsilon - epsilon_decay
 
@@ -148,11 +143,12 @@ for episode in range(episodes):
 			# collect bounding boxes for each image
 			ground_image_bb_gt = groundtruths[image_ix]#image_actions.get_bb_gt(image_name)
 
-			## data augmentation -> 0.5 probability of flipping image and bounding box horizontally
-			# augment = bool(random.getrandbits(1))
-			# if augment:
-			# 	original_image, ground_image_bb_gt = image_augmentation.flip_image(original_image, ground_image_bb_gt)
-			# 	image = np.fliplr(image)
+			# data augmentation -> 0.5 probability of flipping image and bounding box horizontally
+			if augmented:
+				augment = bool(random.getrandbits(1))
+				if augment:
+					original_image, ground_image_bb_gt = image_augmentation.flip_image(original_image, ground_image_bb_gt)
+					image = np.fliplr(image)
 
 			# initial bounding box (whole image, raw size)
 			boundingbox = np.array([[0,0],image_dimensions])
@@ -188,8 +184,9 @@ for episode in range(episodes):
 				# collect the preprocessed image
 				preprocessed_list.append(preprocessed_image)
 				history_list.append(np.array(np.reshape(history_vec, (number_of_actions*history_length))))
+
 				# add action history to experience collection
-				experiences[image_ix-chunk_offset].append([np.array(np.reshape(history_vec, (number_of_actions*history_length)))]) # ADDED!!!
+				experiences[image_ix-chunk_offset].append([np.array(np.reshape(history_vec, (number_of_actions*history_length)))])
 
 				# exploration or exploitation
 				if random.uniform(0,1) < epsilon:
@@ -207,6 +204,8 @@ for episode in range(episodes):
 							for ground_truth in ground_image_bb_gt:
 								potential_iou = reinforcement_helper.IOU(ground_truth, potential_boundingbox)
 								potential_image_IOU.append(potential_iou)
+
+							# store only positive actions
 							if max(potential_image_IOU) >= max(image_IOU):
 								good_actions.append(act)
 
@@ -313,15 +312,15 @@ for episode in range(episodes):
 		# Actual training per given episode over a set number of experiences (training iterations)
 		# flatten the experiences list for learning
 		flat_experiences = [x for l in experiences for x in l]
-		num_of_experiences = len(flat_experiences) # ADDED!!!!
+		num_of_experiences = len(flat_experiences) 
 		
 		random_experiences = np.array(flat_experiences)
 
 		# delete variables to free up memory
 		del flat_experiences
 
-		initial_state = np.array([state[4] for state in random_experiences]) # ADDED!!!!
-		next_state = np.array([state[5] for state in random_experiences])# ADDED!!!!
+		initial_state = np.array([state[4] for state in random_experiences]) 
+		next_state = np.array([state[5] for state in random_experiences])
 
 
 		# calculating the Q values for the initial state
@@ -384,21 +383,22 @@ for episode in range(episodes):
 
 
 # Log of training parameters
-log_location = project_root + 'project_code/network_weights/logs/'
+if logging:
+	log_location = project_root + 'project_code/network_weights/logs/'
 
-log_names = ['loaded_weights','episodes', 'epsilon','gamma', 
-				'Time_steps', 'movement_reward', 'terminal_reward_5', 'terminal_reward_7', 'terminal_reward_9',
-				'iou_threshold_5', 'iou_threshold_7','iou_threshold_9','update_step', 'force_terminal']
+	log_names = ['loaded_weights','episodes', 'epsilon','gamma', 
+					'Time_steps', 'movement_reward', 'terminal_reward_5', 'terminal_reward_7', 'terminal_reward_9',
+					'iou_threshold_5', 'iou_threshold_7','iou_threshold_9','update_step', 'force_terminal']
 
-log_vars = [loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,
-			reinforcement_helper.terminal_reward_5,reinforcement_helper.terminal_reward_7,reinforcement_helper.terminal_reward_9,
-			reinforcement_helper.iou_threshold_5, reinforcement_helper.iou_threshold_7,reinforcement_helper.iou_threshold_9,
-			action_functions.update_step, force_terminal]
+	log_vars = [loaded_weights, episodes, epsilon, gamma, T,reinforcement_helper.movement_reward,
+				reinforcement_helper.terminal_reward_5,reinforcement_helper.terminal_reward_7,reinforcement_helper.terminal_reward_9,
+				reinforcement_helper.iou_threshold_5, reinforcement_helper.iou_threshold_7,reinforcement_helper.iou_threshold_9,
+				action_functions.update_step, force_terminal]
 
-with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
-	details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-	details.writerow(log_names)	
-	details.writerow(log_vars)
+	with open(log_location+saved_weights + '.csv', 'wb') as csvfile:
+		details = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+		details.writerow(log_names)	
+		details.writerow(log_vars)
 	
 
 # plotting average reward per action over each episode
