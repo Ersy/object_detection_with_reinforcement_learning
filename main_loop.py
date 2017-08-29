@@ -29,14 +29,14 @@ VOC2012_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2012'
 
 if VOC == True:
 	desired_class_set = 'aeroplane_trainval'
-	desired_class = 'aeroplane'
+	desired_class = 'person'
 
 	### loading up VOC2007 images of a given class
 	img_name_list_2007 = image_actions.get_img_names(VOC2007_path, desired_class_set)
 	img_list_2007 = image_actions.load_images(VOC2007_path, img_name_list_2007) 
 	img_list_2007, groundtruths_2007, img_name_list_2007 = image_loader.get_class_images(VOC2007_path, desired_class, img_name_list_2007, img_list_2007)
 
-	desired_class_set = 'aeroplane_train'
+	desired_class_set = 'person_train'
 
 	### loading up VOC2012 images of a given class
 	img_name_list_2012 = image_actions.get_img_names(VOC2012_path, desired_class_set)
@@ -74,7 +74,7 @@ loaded_weights = '0'
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=loaded_weights)
 
 # Validation callback
-saved_weights = 'Aeroplane_TEST.hdf5'
+saved_weights = 'Person_TEST.hdf5'
 filepath= project_root+'project_code/network_weights/' + saved_weights
 checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
 Plateau = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=20, verbose=1, mode='min', epsilon=0.0001, cooldown=0, min_lr=0)
@@ -98,7 +98,10 @@ logging = False
 conv_predict_batch_size = 40 # Decrease value if low on VRAM
 Q_predict_batch_size = 10000
 Q_train_batch_size = 1000
-chunk_factor = 3 # Increase value if low on RAM
+
+
+
+chunk_factor = int(len(img_list)/200) #10 # Increase value if low on RAM
 chunk_size = int(len(img_list)/chunk_factor)
 
 

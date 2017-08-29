@@ -38,7 +38,7 @@ VOC_path = project_root+ 'Reinforcement learning/VOCdevkit/VOC2007'
 #image = args['image']
 
 
-image_path = "/home/ersy/Downloads/aeroplane_example7.jpg"
+image_path = "/home/ersy/Downloads/person_example.jpg"
 loaded_image = image.load_img(image_path, False)
 
 
@@ -54,7 +54,7 @@ vgg16_conv = VGG16(include_top=False, weights='imagenet')
 weights_path = '/media/ersy/Other/Google Drive/QM Work/Queen Mary/Course/Final Project/project_code/network_weights/final_weights/'
 
 # change the weights loaded for Q network testing
-saved_weights = 'Aeroplane_TEST.hdf5'
+saved_weights = 'Person_TEST.hdf5'
 weights = weights_path+saved_weights
 
 Q_net = reinforcement_helper.get_q_network(shape_of_input=Q_net_input_size, number_of_actions=number_of_actions, weights_path=weights)
